@@ -26,7 +26,7 @@ jobs:
         run: npm run build
 
       - name: Add Android platform
-        run: npx cap add android
+        run: npx cap add android || echo "Android platform may already exist"
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -41,10 +41,14 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --info 2>&1 | tail -20
+
+      - name: List APK files
+        run: find android -name "*.apk" -type f
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: todo-app-debug
           path: android/app/build/outputs/apk/debug/*.apk
