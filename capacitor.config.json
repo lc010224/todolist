@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/capacitor.config.json",
+  "appId": "com.todo.app",
+  "appName": "待办清单",
+  "webDir": "out",
+  "server": {
+    "androidScheme": "https"
+  }
+}
