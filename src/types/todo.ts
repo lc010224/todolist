@@ -16,7 +16,7 @@ export interface Task {
   status: TaskStatus;
   dueDate?: string;
   dueTime?: string;
-  workload?: Workload; // 工作量
+  workload?: Workload;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -24,6 +24,9 @@ export interface Task {
   subTasks: SubTask[];
   tags: string[];
   isArchived: boolean;
+  isRecurring?: boolean; // 是否为习惯/每日任务
+  missed?: boolean; // 是否为未完成转移的任务（标记红叉）
+  originalTaskId?: string; // 如果是转移的任务，记录原始任务ID
 }
 
 // 工作量配置

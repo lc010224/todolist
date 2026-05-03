@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { TaskItem } from '@/components/TaskItem';
 import { TaskEditModal } from '@/components/TaskEditModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
+import { TransferTasksModal } from '@/components/TransferTasksModal';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -45,6 +46,11 @@ export default function Home() {
   const getUpcomingTasks = useTodoStore((state) => state.getUpcomingTasks);
   const getImportantTasks = useTodoStore((state) => state.getImportantTasks);
   const getCompletedTasks = useTodoStore((state) => state.getCompletedTasks);
+  const pendingTransferTasks = useTodoStore((state) => state.pendingTransferTasks);
+  const confirmTransferTasks = useTodoStore((state) => state.confirmTransferTasks);
+  const dismissTransferTasks = useTodoStore((state) => state.dismissTransferTasks);
+  const checkAndProcessDailyTasks = useTodoStore((state) => state.checkAndProcessDailyTasks);
+  const generateRecurringTasks = useTodoStore((state) => state.generateRecurringTasks);
   
   const currentList = lists.find((l) => l.id === currentListId);
   
@@ -179,6 +185,12 @@ export default function Home() {
       }
     };
   }, [isRunning, mode, sessions, switchMode]);
+  
+  // 每日检查：检查未完成任务和生成习惯任务
+  useEffect(() => {
+    checkAndProcessDailyTasks();
+    generateRecurringTasks(new Date());
+  }, [checkAndProcessDailyTasks, generateRecurringTasks]);
   
   const toggleTimer = () => {
     setIsRunning(!isRunning);
@@ -585,7 +597,7 @@ export default function Home() {
                     {day.weekDay}
                   </span>
                   {day.isToday && (
-                    <div className="absolute -bottom-0.5 w-5 h-5 border-2 border-green-500 rounded-full" />
+                    <div className="absolute -bottom-0.5 w-5 h-5 bg-green-500 rounded-full" />
                   )}
                 </div>
               </div>
@@ -831,6 +843,15 @@ export default function Home() {
           task={editingTask}
           isOpen={!!editingTask}
           onClose={() => setEditingTask(null)}
+        />
+      )}
+      
+      {/* 未完成任务转移弹窗 */}
+      {pendingTransferTasks.length > 0 && (
+        <TransferTasksModal
+          tasks={pendingTransferTasks}
+          onConfirm={confirmTransferTasks}
+          onDismiss={dismissTransferTasks}
         />
       )}
     </div>

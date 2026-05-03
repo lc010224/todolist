@@ -2,12 +2,15 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { Task, TaskList, AppSettings, defaultLists, Priority, SubTask, TaskStatus, Workload } from '@/types/todo';
+import { startOfDay, isSameDay, addDays, parseISO, format } from 'date-fns';
 
 interface TodoStore {
   // 状态
   tasks: Task[];
   lists: TaskList[];
   settings: AppSettings;
+  lastCheckedDate: string; // 上次检查日期，用于每日检查
+  pendingTransferTasks: Task[]; // 待转移的未完成任务（用于弹窗显示）
   
   // 设置
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -21,7 +24,7 @@ interface TodoStore {
   deleteList: (id: string) => void;
   
   // 任务操作
-  addTask: (title: string, listId?: string, priority?: Priority, workload?: Workload, dueDate?: string, dueTime?: string) => string;
+  addTask: (title: string, listId?: string, priority?: Priority, workload?: Workload, dueDate?: string, dueTime?: string, isRecurring?: boolean) => string;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTaskComplete: (id: string) => void;
@@ -39,6 +42,13 @@ interface TodoStore {
   getImportantTasks: () => Task[];
   getCompletedTasks: () => Task[];
   searchTasks: (query: string) => Task[];
+  
+  // 每日检查相关
+  checkAndProcessDailyTasks: () => void;
+  setPendingTransferTasks: (tasks: Task[]) => void;
+  confirmTransferTasks: () => void;
+  dismissTransferTasks: () => void;
+  generateRecurringTasks: (today: Date) => void;
 }
 
 export const useTodoStore = create<TodoStore>()(
@@ -52,6 +62,8 @@ export const useTodoStore = create<TodoStore>()(
         enableNotifications: true,
         enableHaptics: true,
       },
+      lastCheckedDate: '',
+      pendingTransferTasks: [],
       
       // 设置操作
       setTheme: (theme) => set((state) => ({
@@ -98,7 +110,7 @@ export const useTodoStore = create<TodoStore>()(
       })),
       
       // 任务操作
-      addTask: (title, listId, priority = 'medium', workload, dueDate, dueTime) => {
+      addTask: (title, listId, priority = 'medium', workload, dueDate, dueTime, isRecurring = false) => {
         const id = uuidv4();
         const now = new Date().toISOString();
         const newTask: Task = {
@@ -115,6 +127,7 @@ export const useTodoStore = create<TodoStore>()(
           workload,
           dueDate,
           dueTime,
+          isRecurring,
         };
         set((state) => ({ tasks: [...state.tasks, newTask] }));
         return id;
@@ -245,6 +258,114 @@ export const useTodoStore = create<TodoStore>()(
           task.description?.toLowerCase().includes(lowerQuery) ||
           task.tags.some((tag) => tag.toLowerCase().includes(lowerQuery))
         );
+      },
+      
+      // 每日检查：检查是否有未完成任务需要转移
+      checkAndProcessDailyTasks: () => {
+        const state = get();
+        const today = startOfDay(new Date());
+        const lastChecked = state.lastCheckedDate ? startOfDay(parseISO(state.lastCheckedDate)) : null;
+        
+        // 如果今天已经检查过，不需要重复检查
+        if (lastChecked && isSameDay(lastChecked, today)) {
+          return;
+        }
+        
+        // 查找昨天的未完成任务（不包括已完成和习惯任务）
+        const yesterday = addDays(today, -1);
+        const yesterdayTasks = state.tasks.filter((task) => {
+          if (task.status === 'completed' || task.isArchived) return false;
+          if (task.isRecurring) return false; // 习惯任务不处理
+          if (!task.dueDate) return false;
+          const dueDate = startOfDay(parseISO(task.dueDate));
+          return isSameDay(dueDate, yesterday);
+        });
+        
+        if (yesterdayTasks.length > 0) {
+          set({ pendingTransferTasks: yesterdayTasks });
+        }
+        
+        // 更新最后检查日期
+        set({ lastCheckedDate: today.toISOString() });
+      },
+      
+      // 设置待转移的任务
+      setPendingTransferTasks: (tasks) => set({ pendingTransferTasks: tasks }),
+      
+      // 确认转移任务
+      confirmTransferTasks: () => {
+        const { pendingTransferTasks, tasks } = get();
+        const today = startOfDay(new Date());
+        const todayStr = format(today, 'yyyy-MM-dd');
+        
+        const updatedTasks = tasks.map((task) => {
+          const pendingTask = pendingTransferTasks.find((pt) => pt.id === task.id);
+          if (pendingTask) {
+            // 标记原任务为未完成
+            return { ...task, missed: true };
+          }
+          return task;
+        });
+        
+        // 创建今天的新任务（复制未完成的任务）
+        const newTasks = pendingTransferTasks.map((task) => ({
+          ...task,
+          id: uuidv4(),
+          dueDate: todayStr,
+          status: 'active' as const,
+          missed: false,
+          completedAt: undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          originalTaskId: task.id,
+        }));
+        
+        set({
+          tasks: [...updatedTasks, ...newTasks],
+          pendingTransferTasks: [],
+        });
+      },
+      
+      // 忽略转移任务
+      dismissTransferTasks: () => {
+        set({ pendingTransferTasks: [] });
+      },
+      
+      // 生成习惯任务（每天自动生成）
+      generateRecurringTasks: (today: Date) => {
+        const { tasks } = get();
+        const todayStart = startOfDay(today);
+        const todayStr = format(todayStart, 'yyyy-MM-dd');
+        
+        // 找出所有习惯任务
+        const recurringTasks = tasks.filter((task) => task.isRecurring && !task.isArchived);
+        
+        // 检查今天是否已经有这个习惯任务
+        const existingRecurringTasksToday = tasks.filter((task) => {
+          if (!task.isRecurring || task.isArchived) return false;
+          if (!task.dueDate) return false;
+          return isSameDay(parseISO(task.dueDate), todayStart);
+        });
+        
+        const existingIds = new Set(existingRecurringTasksToday.map((t) => t.originalTaskId || t.id));
+        
+        // 为今天还没有的习惯任务创建新任务
+        const newTasks = recurringTasks
+          .filter((task) => !existingIds.has(task.id))
+          .map((task) => ({
+            ...task,
+            id: uuidv4(),
+            dueDate: todayStr,
+            status: 'active' as const,
+            missed: false,
+            completedAt: undefined,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }));
+        
+        if (newTasks.length > 0) {
+          set((state) => ({ tasks: [...state.tasks, ...newTasks] }));
+        }
       },
     }),
     {

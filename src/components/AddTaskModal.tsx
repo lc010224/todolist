@@ -15,6 +15,7 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
   const [workload, setWorkload] = useState<Workload>('medium');
   const [dueDate, setDueDate] = useState('');
   const [dueTime, setDueTime] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
   
   const addTask = useTodoStore((state) => state.addTask);
   
@@ -26,8 +27,9 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       undefined, 
       priority, 
       workload, 
-      dueDate || undefined, 
-      dueTime || undefined
+      dueDate || format(new Date(), 'yyyy-MM-dd'), 
+      dueTime || undefined,
+      isRecurring
     );
     
     onClose();
@@ -148,6 +150,26 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
                 </button>
               ))}
             </div>
+          </div>
+          
+          {/* 习惯任务开关 */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+            <div>
+              <div className="text-sm font-medium text-gray-800 dark:text-white">习惯任务</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">每天自动显示，适合坚持类任务</div>
+            </div>
+            <button
+              onClick={() => setIsRecurring(!isRecurring)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                isRecurring ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            >
+              <div
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                  isRecurring ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
         </div>
       </div>

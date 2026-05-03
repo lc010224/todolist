@@ -57,6 +57,11 @@ export function TaskItem({ task, onEdit }: TaskItemProps) {
   return (
     <div className="group bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors rounded-lg">
       <div className="flex items-center gap-3 px-3 py-2.5">
+        {/* 未完成标记（红叉） */}
+        {task.missed && (
+          <span className="text-red-500 font-bold text-lg mr-1">✕</span>
+        )}
+        
         {/* 圆形复选框 */}
         <button
           onClick={() => toggleTaskComplete(task.id)}
@@ -104,6 +109,14 @@ export function TaskItem({ task, onEdit }: TaskItemProps) {
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <span>📋</span>
                 <span>{completedSubTasks}/{totalSubTasks}</span>
+              </div>
+            )}
+            
+            {/* 习惯任务标记 */}
+            {task.isRecurring && (
+              <div className="flex items-center gap-1 text-xs text-purple-500">
+                <span>🔄</span>
+                <span>习惯</span>
               </div>
             )}
           </div>
