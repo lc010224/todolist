@@ -10,7 +10,7 @@
     "export": "npm run build && next export",
     "android:init": "cap add android",
     "android:sync": "cap sync android",
-    "android:build": "npm run build && next export && cap copy android && cd android && ./gradlew assembleDebug",
+    "android:build": "npm run build && cap copy android && cd android && ./gradlew assembleDebug",
     "android:open": "cap open android"
   },
   "dependencies": {
