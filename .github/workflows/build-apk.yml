@@ -15,7 +15,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Build - ${{ github.ref_type == 'tag' && github.ref_name || github.ref_name }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -60,6 +60,60 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Generate or restore signing key
+        id: keystore
+        run: |
+          KEYSTORE_FILE="android/app/release.keystore"
+          KEYSTORE_B64="${{ secrets.KEYSTORE_BASE64 }}"
+
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "Restoring existing keystore from secret..."
+            echo "$KEYSTORE_B64" | base64 -d > "$KEYSTORE_FILE"
+            echo "keystore_restored=true" >> $GITHUB_OUTPUT
+          else
+            echo "Generating new keystore..."
+            keytool -genkeypair \
+              -v \
+              -storetype PKCS12 \
+              -keystore "$KEYSTORE_FILE" \
+              -alias release \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass todolist123 \
+              -keypass todolist123 \
+              -dname "CN=todo-app, OU=todo, O=todo, L=beijing, ST=beijing, C=CN"
+            echo "keystore_restored=false" >> $GITHUB_OUTPUT
+            echo "new_keystore_generated=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Show new keystore (first time only)
+        if: steps.keystore.outputs.new_keystore_generated == 'true'
+        run: |
+          echo "==================================================================="
+          echo "NEW KEYSTORE GENERATED! Please add this secret to GitHub:"
+          echo "==================================================================="
+          KEYSTORE_B64=$(base64 -w 0 android/app/release.keystore)
+          echo ""
+          echo "Secret name: KEYSTORE_BASE64"
+          echo "Secret value:"
+          echo "$KEYSTORE_B64"
+          echo ""
+          echo "==================================================================="
+          echo "Add this in: GitHub > Settings > Secrets > Actions > New secret"
+          echo "==================================================================="
+          echo "keystore_base64::$KEYSTORE_B64"
+
+      - name: Configure signing
+        if: steps.keystore.outputs.keystore_restored == 'true' || steps.keystore.outputs.new_keystore_generated == 'true'
+        run: |
+          cat >> android/gradle.properties << EOF
+          KEYSTORE_PATH=app/release.keystore
+          KEYSTORE_PASSWORD=todolist123
+          KEY_ALIAS=release
+          KEY_PASSWORD=todolist123
+          EOF
 
       - name: Build debug APK
         run: |
