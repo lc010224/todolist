@@ -193,7 +193,7 @@ export default function Home() {
               const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVcQNpHW+NueZVQ1Wq/w/5xkPzJJlub/o2hbOUmI1vTlpn5gMUOQ3PTrnnxjLj+P4fTvqYZnMD2L4fX0qoNrLzmI4vX4r4RxKjmD4fb8sYd0LzmA4ff+s4l3MzmA4Pf+tYx5NTl/4Pf+u5B8OTl+4Pf+vJJ+PTp94Pf+vpOQQEBA');
               audio.play().catch(() => {});
             } catch (e) {}
-            
+
             // 切换到下一个模式
             if (mode === 'work') {
               const newSessions = sessions + 1;
@@ -213,12 +213,14 @@ export default function Home() {
         });
       }, 1000);
     }
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, mode, sessions, switchMode]);
   
   // 每日检查：检查未完成任务和生成习惯任务
