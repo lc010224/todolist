@@ -17,7 +17,7 @@ interface TodoStore {
   setDefaultList: (listId: string) => void;
   toggleNotifications: () => void;
   toggleHaptics: () => void;
-  setPomodoroSettings: (settings: { workDuration?: number; shortBreak?: number; longBreak?: number; soundEnabled?: boolean }) => void;
+  setPomodoroSettings: (settings: { pomodoroWorkDuration?: number; pomodoroShortBreak?: number; pomodoroLongBreak?: number; pomodoroSoundEnabled?: boolean }) => void;
   togglePomodoroSound: () => void;
   
   // 列表操作

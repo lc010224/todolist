@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/useAuth';
 
 export function LoginButton() {
-  const { user, loading, signIn, signOutUser } = useAuth();
+  const { user, loading, signIn, signOutUser, isEnabled } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
 
   const handleSignIn = async () => {
@@ -23,6 +23,20 @@ export function LoginButton() {
       await signOutUser();
     }
   };
+
+  // 如果 Firebase 未配置，显示提示
+  if (!isEnabled) {
+    return (
+      <div className="text-center py-4">
+        <div className="text-gray-500 dark:text-gray-400 text-sm">
+          云同步功能暂时不可用
+        </div>
+        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          请配置 Firebase 以启用登录同步
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

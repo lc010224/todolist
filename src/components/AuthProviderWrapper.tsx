@@ -2,65 +2,39 @@
 
 import { useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from '@/lib/useAuth';
-import { db } from '@/lib/firebase';
-import { subscribeToUserData, mergeUserData, saveUserData } from '@/lib/sync';
+import { db, isValidConfig } from '@/lib/firebase';
+import { subscribeToUserData, saveUserData } from '@/lib/sync';
 import { useTodoStore } from '@/store/todoStore';
 
 function SyncHandler() {
   const { user, loading } = useAuth();
-  const store = useTodoStore();
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const isSyncingRef = useRef(false);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !isValidConfig) return;
 
     if (user) {
       // 用户已登录，设置云端同步
-      const loadAndMergeData = async () => {
-        try {
-          // 订阅云端数据变化
-          if (unsubscribeRef.current) {
-            unsubscribeRef.current();
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+
+      unsubscribeRef.current = subscribeToUserData(
+        db!,
+        user,
+        (cloudData) => {
+          // 合并数据到本地 store
+          const store = useTodoStore.getState();
+          store.tasks = cloudData.tasks || [];
+          store.lists = cloudData.lists || [];
+          if (cloudData.settings) {
+            store.settings = { ...store.settings, ...cloudData.settings };
           }
-
-          unsubscribeRef.current = subscribeToUserData(
-            db,
-            user,
-            (cloudData) => {
-              if (isSyncingRef.current) return;
-              isSyncingRef.current = true;
-
-              // 合并数据
-              const merged = mergeUserData(
-                {
-                  tasks: store.tasks,
-                  lists: store.lists,
-                  settings: { ...store.settings, lastLocalUpdate: new Date().toISOString() }
-                },
-                cloudData
-              );
-
-              // 更新本地 store
-              store.tasks = merged.tasks;
-              store.lists = merged.lists;
-              store.settings = { ...store.settings, ...merged.settings };
-
-              setTimeout(() => {
-                isSyncingRef.current = false;
-              }, 1000);
-            },
-            (error) => {
-              console.error('Sync error:', error);
-              isSyncingRef.current = false;
-            }
-          );
-        } catch (error) {
-          console.error('Failed to setup sync:', error);
+        },
+        (error) => {
+          console.error('Sync error:', error);
         }
-      };
-
-      loadAndMergeData();
+      );
     } else {
       // 用户未登录，取消订阅
       if (unsubscribeRef.current) {
@@ -79,10 +53,11 @@ function SyncHandler() {
 
   // 保存数据到云端
   useEffect(() => {
-    if (!user || loading) return;
+    if (!user || loading || !isValidConfig) return;
 
     const saveTimer = setTimeout(() => {
-      saveUserData(db, user, {
+      const store = useTodoStore.getState();
+      saveUserData(db!, user, {
         tasks: store.tasks,
         lists: store.lists,
         settings: { ...store.settings, lastLocalUpdate: new Date().toISOString() },
@@ -91,7 +66,7 @@ function SyncHandler() {
     }, 2000); // 延迟2秒保存，避免频繁写入
 
     return () => clearTimeout(saveTimer);
-  }, [store.tasks, store.lists, store.settings, user, loading]);
+  }, [user, loading]);
 
   return null;
 }

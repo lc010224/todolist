@@ -1,27 +1,34 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User, doc, db, setDoc, getDoc } from './firebase';
+import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged, isValidConfig, User } from './firebase';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: () => Promise<void>;
   signOutUser: () => Promise<void>;
+  isEnabled: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  loading: true,
+  loading: false,
   signIn: async () => {},
   signOutUser: async () => {},
+  isEnabled: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!isValidConfig || !auth) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -30,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async () => {
+    if (!auth || !googleProvider) return;
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
@@ -39,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOutUser = async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
     } catch (error) {
@@ -48,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOutUser }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOutUser, isEnabled: isValidConfig }}>
       {children}
     </AuthContext.Provider>
   );
