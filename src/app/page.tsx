@@ -781,9 +781,12 @@ export default function Home() {
     // 调整时间
     const [showDurationPicker, setShowDurationPicker] = useState<'work' | 'shortBreak' | 'longBreak' | null>(null);
     const [tempDuration, setTempDuration] = useState(25);
-    const settingsScrollRef = useRef<HTMLDivElement>(null);
+    const [savedScrollPos, setSavedScrollPos] = useState<number | null>(null);
 
     const openDurationPicker = (type: 'work' | 'shortBreak' | 'longBreak', currentValue: number) => {
+      // 保存当前滚动位置
+      const el = document.getElementById('settings-page');
+      if (el) setSavedScrollPos(el.scrollTop);
       setTempDuration(currentValue);
       setShowDurationPicker(type);
     };
@@ -798,6 +801,17 @@ export default function Home() {
       }
       setShowDurationPicker(null);
     };
+
+    // 恢复滚动位置
+    useEffect(() => {
+      if (savedScrollPos !== null) {
+        const el = document.getElementById('settings-page');
+        if (el) {
+          el.scrollTop = savedScrollPos;
+          setSavedScrollPos(null);
+        }
+      }
+    }, [savedScrollPos]);
 
     return (
       <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
