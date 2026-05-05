@@ -781,6 +781,7 @@ export default function Home() {
     // 调整时间
     const [showDurationPicker, setShowDurationPicker] = useState<'work' | 'shortBreak' | 'longBreak' | null>(null);
     const [tempDuration, setTempDuration] = useState(25);
+    const settingsScrollRef = useRef<HTMLDivElement>(null);
 
     const openDurationPicker = (type: 'work' | 'shortBreak' | 'longBreak', currentValue: number) => {
       setTempDuration(currentValue);
@@ -1396,7 +1397,7 @@ export default function Home() {
         {/* 内容区域 */}
         {isPomodoroPage ? renderPomodoroPage() :
          isCalendarPage ? renderCalendarPage() :
-         isSettingsPage ? <RenderSettingsPage /> :
+         isSettingsPage ? <div ref={settingsScrollRef} id="settings-page" className="overflow-y-auto"><RenderSettingsPage /></div> :
          renderNormalPage()}
         
         {/* 右下角添加按钮 - 只在清单列表页面显示 */}
