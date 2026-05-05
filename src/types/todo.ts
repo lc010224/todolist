@@ -4,8 +4,9 @@ export type Workload = 'quick' | 'medium' | 'long'; // 快速、中等、耗时
 
 export interface User {
   name: string;
-  avatar: string; // 颜色代码或 emoji
+  avatar: string; // 颜色代码、emoji 或 base64 图片
   isLoggedIn: boolean;
+  loginType?: 'local' | 'wechat'; // 登录方式
 }
 
 export interface SubTask {

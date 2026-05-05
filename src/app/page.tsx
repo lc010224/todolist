@@ -9,6 +9,7 @@ import { TaskEditModal } from '@/components/TaskEditModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { TransferTasksModal } from '@/components/TransferTasksModal';
 import { SyncSettings } from '@/components/SyncSettings';
+import { UserSettings } from '@/components/UserSettings';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths, startOfDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -737,6 +738,7 @@ export default function Home() {
   // 渲染设置页面
   const RenderSettingsPage = () => {
     const settingsRaw = useTodoStore((state) => state.settings);
+    const user = useTodoStore((state) => state.user);
     // 添加默认值回退，防止 localStorage 中没有这些字段
     const settings = {
       ...settingsRaw,
@@ -754,6 +756,12 @@ export default function Home() {
     const importData = useTodoStore((state) => state.importData);
     const clearCompletedTasks = useTodoStore((state) => state.clearCompletedTasks);
     const tasks = useTodoStore((state) => state.tasks);
+
+    // 用户设置弹窗
+    const [showUserSettings, setShowUserSettings] = useState(false);
+
+    const avatarColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+    const avatarEmojis = ['😊', '😎', '🤗', '😇', '🥰', '😺', '🐱', '🦊'];
 
     // 同步设置弹窗状态
     const [showSyncModal, setShowSyncModal] = useState(false);
@@ -851,6 +859,43 @@ export default function Home() {
     return (
       <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-lg mx-auto p-4 space-y-4">
+          {/* 用户卡片 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <button
+              onClick={() => setShowUserSettings(true)}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-2xl transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold"
+                  style={{ 
+                    backgroundColor: user?.avatar && avatarColors.includes(user.avatar as any) ? user.avatar : '#3b82f6' 
+                  }}
+                >
+                  {user?.avatar && avatarEmojis.includes(user.avatar as any) 
+                    ? user.avatar 
+                    : (user?.name?.charAt(0).toUpperCase() || '登')}
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">
+                    {user?.isLoggedIn ? user.name : '登录账号'}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {user?.isLoggedIn ? '点击修改个人信息' : '登录以同步数据'}
+                  </div>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* 用户设置弹窗 */}
+          {showUserSettings && (
+            <UserSettings onClose={() => setShowUserSettings(false)} />
+          )}
+
           {/* 数据同步卡片 - 改为点击条目 */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
             <button
@@ -1183,12 +1228,32 @@ export default function Home() {
                   -
                 </button>
                 <input
-                  type="number"
-                  value={tempDuration}
-                  onChange={(e) => setTempDuration(Math.max(1, Math.min(120, parseInt(e.target.value) || 1)))}
+                  type="text"
+                  inputMode="numeric"
+                  value={String(tempDuration)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val === '') {
+                      setTempDuration(1);
+                    } else {
+                      const num = parseInt(val, 10);
+                      if (num >= 1 && num <= 120) {
+                        setTempDuration(num);
+                      } else if (num > 120) {
+                        setTempDuration(120);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    const num = parseInt(val, 10);
+                    if (isNaN(num) || num < 1) {
+                      setTempDuration(1);
+                    } else if (num > 120) {
+                      setTempDuration(120);
+                    }
+                  }}
                   className="w-20 h-12 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white"
-                  min="1"
-                  max="120"
                 />
                 <button
                   onClick={() => setTempDuration(Math.min(120, tempDuration + 5))}
