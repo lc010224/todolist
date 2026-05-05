@@ -40,14 +40,6 @@ export default function Home() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 初始化番茄钟时间
-  useEffect(() => {
-    if (!initialized && settings) {
-      setTimeLeft(settings.pomodoroWorkDuration * 60);
-      setInitialized(true);
-    }
-  }, [settings, initialized]);
-
   const lists = useTodoStore((state) => state.lists);
   const tasks = useTodoStore((state) => state.tasks);
   const settings = useTodoStore((state) => state.settings);
@@ -61,6 +53,14 @@ export default function Home() {
   const dismissTransferTasks = useTodoStore((state) => state.dismissTransferTasks);
   const checkAndProcessDailyTasks = useTodoStore((state) => state.checkAndProcessDailyTasks);
   const generateRecurringTasks = useTodoStore((state) => state.generateRecurringTasks);
+
+  // 初始化番茄钟时间
+  useEffect(() => {
+    if (!initialized) {
+      setTimeLeft(settings.pomodoroWorkDuration * 60);
+      setInitialized(true);
+    }
+  }, [settings, initialized]);
   
   const currentList = lists.find((l) => l.id === currentListId);
   
