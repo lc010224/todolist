@@ -1,20 +1,99 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTodoStore } from '@/store/todoStore';
+import { UserSettings } from './UserSettings';
 
 interface SidebarProps {
   currentListId: string;
   onSelectList: (listId: string) => void;
 }
 
+// 主题切换组件
+function ThemeToggle() {
+  const settings = useTodoStore((state) => state.settings);
+  const setTheme = useTodoStore((state) => state.setTheme);
+
+  const toggleTheme = () => {
+    // 循环切换：system -> light -> dark -> system
+    if (settings.theme === 'system') {
+      setTheme('light');
+    } else if (settings.theme === 'light') {
+      setTheme('dark');
+    } else {
+      setTheme('system');
+    }
+  };
+
+  const getThemeIcon = () => {
+    if (settings.theme === 'dark') {
+      return (
+        <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      );
+    } else if (settings.theme === 'light') {
+      return (
+        <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      );
+    }
+    return (
+      <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    );
+  };
+
+  return (
+    <button onClick={toggleTheme} className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors" title={`当前: ${settings.theme === 'system' ? '跟随系统' : settings.theme === 'light' ? '浅色' : '深色'}`}>
+      {getThemeIcon()}
+    </button>
+  );
+}
+
 export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
   const lists = useTodoStore((state) => state.lists);
   const tasks = useTodoStore((state) => state.tasks);
+  const user = useTodoStore((state) => state.user);
   const addList = useTodoStore((state) => state.addList);
   
-  const [showAddList, setShowAddList] = React.useState(false);
-  const [newListName, setNewListName] = React.useState('');
+  const [showAddList, setShowAddList] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  
+  // 头像颜色列表
+  const avatarColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+  const avatarEmojis = ['😊', '😎', '🤗', '😇', '🥰', '😺', '🐱', '🦊'];
+  
+  // 获取用户头像
+  const getUserAvatar = () => {
+    if (!user) {
+      return (
+        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400">
+          👤
+        </div>
+      );
+    }
+    
+    if (avatarEmojis.includes(user.avatar)) {
+      return (
+        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg">
+          {user.avatar}
+        </div>
+      );
+    }
+    
+    return (
+      <div 
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+        style={{ backgroundColor: user.avatar }}
+      >
+        {user.name.charAt(0).toUpperCase()}
+      </div>
+    );
+  };
   
   const getTaskCount = (listId: string) => {
     switch (listId) {
@@ -79,11 +158,7 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
           <span className="text-xl">📝</span>
           <h1 className="text-base font-semibold text-gray-800 dark:text-white">待办清单</h1>
         </div>
-        <button className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
-          <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-        </button>
+        <ThemeToggle />
       </div>
       
       {/* 清单标题 */}
@@ -203,16 +278,22 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
       
       {/* 底部用户区 */}
       <div className="p-3 border-t border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer transition-colors">
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
-            U
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-800 dark:text-white">用户</p>
+        <button
+          onClick={() => setShowUserSettings(true)}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+        >
+          {getUserAvatar()}
+          <div className="flex-1 text-left">
+            <p className="text-sm font-medium text-gray-800 dark:text-white">{user?.name || '点击登录'}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">免费版</p>
           </div>
-        </div>
+        </button>
       </div>
+      
+      {/* 用户设置弹窗 */}
+      {showUserSettings && (
+        <UserSettings onClose={() => setShowUserSettings(false)} />
+      )}
     </div>
   );
 }

@@ -1,16 +1,23 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, TaskList, AppSettings, defaultLists, Priority, SubTask, TaskStatus, Workload } from '@/types/todo';
+import { Task, TaskList, AppSettings, defaultLists, Priority, SubTask, TaskStatus, Workload, User } from '@/types/todo';
 import { startOfDay, isSameDay, addDays, parseISO, format } from 'date-fns';
+
+// 用户默认设置
+const defaultUser: User | null = null;
 
 interface TodoStore {
   // 状态
   tasks: Task[];
   lists: TaskList[];
   settings: AppSettings;
+  user: User | null;
   lastCheckedDate: string; // 上次检查日期，用于每日检查
   pendingTransferTasks: Task[]; // 待转移的未完成任务（用于弹窗显示）
+  
+  // 用户设置
+  setUser: (user: User | null) => void;
   
   // 设置
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -73,8 +80,12 @@ export const useTodoStore = create<TodoStore>()(
         pomodoroLongBreak: 15,
         pomodoroSoundEnabled: true,
       },
+      user: defaultUser,
       lastCheckedDate: '',
       pendingTransferTasks: [],
+
+      // 用户设置
+      setUser: (user) => set({ user }),
 
       // 设置操作
       setTheme: (theme) => set((state) => ({
@@ -397,7 +408,7 @@ export const useTodoStore = create<TodoStore>()(
           lists: state.lists,
           settings: state.settings,
           exportedAt: new Date().toISOString(),
-          version: '1.0.6',
+          version: '1.1.0',
         };
         return JSON.stringify(data, null, 2);
       },

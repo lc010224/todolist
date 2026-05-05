@@ -12,6 +12,37 @@ import { SyncSettings } from '@/components/SyncSettings';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths, startOfDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
+// 主题应用组件
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const settings = useTodoStore((state) => state.settings);
+  
+  useEffect(() => {
+    const root = document.documentElement;
+    const theme = settings.theme || 'system';
+    
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.toggle('dark', prefersDark);
+    } else {
+      root.classList.toggle('dark', theme === 'dark');
+    }
+  }, [settings.theme]);
+  
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (settings.theme === 'system') {
+        document.documentElement.classList.toggle('dark', e.matches);
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [settings.theme]);
+  
+  return <>{children}</>;
+}
+
 // 番茄钟配置
 const POMODORO_CONFIG = {
   work: 25 * 60, // 25分钟工作
@@ -724,6 +755,9 @@ export default function Home() {
     const clearCompletedTasks = useTodoStore((state) => state.clearCompletedTasks);
     const tasks = useTodoStore((state) => state.tasks);
 
+    // 同步设置弹窗状态
+    const [showSyncModal, setShowSyncModal] = useState(false);
+
     const totalTasks = tasks.filter(t => !t.isArchived).length;
     const completedTasks = tasks.filter(t => t.status === 'completed' && !t.isArchived).length;
     const activeTasks = totalTasks - completedTasks;
@@ -817,10 +851,31 @@ export default function Home() {
     return (
       <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-lg mx-auto p-4 space-y-4">
-          {/* 数据同步卡片 */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <SyncSettings />
+          {/* 数据同步卡片 - 改为点击条目 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <button
+              onClick={() => setShowSyncModal(true)}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-2xl transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <span className="text-lg">🔄</span>
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">数据同步</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">WebDAV 云同步</div>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
+
+          {/* 同步设置弹窗 */}
+          {showSyncModal && (
+            <SyncSettings onClose={() => setShowSyncModal(false)} />
+          )}
 
           {/* 统计数据 */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm">
@@ -1072,7 +1127,7 @@ export default function Home() {
                 </div>
                 <div className="flex-1 text-left">
                   <div className="text-sm font-medium text-gray-800 dark:text-white">版本信息</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">v1.0.6</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">v1.1.0</div>
                 </div>
               </div>
               <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
@@ -1305,6 +1360,7 @@ export default function Home() {
   );
   
   return (
+    <ThemeProvider>
     <div className="flex h-screen bg-white dark:bg-gray-900">
       {/* 侧边栏 */}
       <div className="hidden md:block">
@@ -1444,5 +1500,6 @@ export default function Home() {
         />
       )}
     </div>
+    </ThemeProvider>
   );
 }

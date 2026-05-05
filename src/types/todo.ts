@@ -2,6 +2,12 @@ export type Priority = 'high' | 'medium' | 'low';
 export type TaskStatus = 'active' | 'completed';
 export type Workload = 'quick' | 'medium' | 'long'; // 快速、中等、耗时
 
+export interface User {
+  name: string;
+  avatar: string; // 颜色代码或 emoji
+  isLoggedIn: boolean;
+}
+
 export interface SubTask {
   id: string;
   title: string;
