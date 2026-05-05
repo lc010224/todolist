@@ -789,11 +789,11 @@ export default function Home() {
 
     const saveDuration = (type: 'work' | 'shortBreak' | 'longBreak') => {
       if (type === 'work') {
-        setPomodoroSettings({ workDuration: tempDuration });
+        setPomodoroSettings({ pomodoroWorkDuration: tempDuration });
       } else if (type === 'shortBreak') {
-        setPomodoroSettings({ shortBreak: tempDuration });
+        setPomodoroSettings({ pomodoroShortBreak: tempDuration });
       } else {
-        setPomodoroSettings({ longBreak: tempDuration });
+        setPomodoroSettings({ pomodoroLongBreak: tempDuration });
       }
       setShowDurationPicker(null);
     };
@@ -1399,8 +1399,8 @@ export default function Home() {
          isSettingsPage ? <RenderSettingsPage /> :
          renderNormalPage()}
         
-        {/* 右下角添加按钮 - 不显示在番茄页面 */}
-        {!isPomodoroPage && (
+        {/* 右下角添加按钮 - 只在清单列表页面显示 */}
+        {!isPomodoroPage && !isCalendarPage && !isSettingsPage && (
           <button
             onClick={() => setShowAddModal(true)}
             className="fixed bottom-24 md:bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 rounded-full shadow-lg 
