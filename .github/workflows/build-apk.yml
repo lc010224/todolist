@@ -14,10 +14,28 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    name: Build - ${{ github.ref_type == 'tag' && github.ref_name || github.ref_name }}
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag info
+        if: startsWith(github.ref, 'refs/tags/')
+        run: echo "BUILD_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Get branch info
+        if: startsWith(github.ref, 'refs/heads/')
+        run: echo "BUILD_BRANCH=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Display build info
+        run: |
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Branch: ${{ env.BUILD_BRANCH || 'N/A' }}"
+          echo "Tag: ${{ env.BUILD_TAG || 'N/A' }}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -56,7 +74,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: todo-app-apk
+          name: todo-app-apk-${{ github.ref_type == 'tag' && github.ref_name || github.ref_name }}
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
