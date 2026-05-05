@@ -4,6 +4,19 @@
   "appName": "待办清单",
   "webDir": "out",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "http"
+  },
+  "android": {
+    "backgroundColor": "#ffffff",
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
   }
 }
