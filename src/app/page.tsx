@@ -8,7 +8,7 @@ import { TaskItem } from '@/components/TaskItem';
 import { TaskEditModal } from '@/components/TaskEditModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { TransferTasksModal } from '@/components/TransferTasksModal';
-import { LoginButton } from '@/components/LoginButton';
+import { SyncSettings } from '@/components/SyncSettings';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths, startOfDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -817,9 +817,9 @@ export default function Home() {
     return (
       <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-lg mx-auto p-4 space-y-4">
-          {/* 用户信息卡片 */}
+          {/* 数据同步卡片 */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <LoginButton />
+            <SyncSettings />
           </div>
 
           {/* 统计数据 */}

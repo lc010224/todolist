@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import { AuthProviderWrapper } from '@/components/AuthProviderWrapper'
 
 export const metadata: Metadata = {
   title: '待办清单',
@@ -28,9 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="antialiased">
-        <AuthProviderWrapper>{children}</AuthProviderWrapper>
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   )
 }
