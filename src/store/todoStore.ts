@@ -113,12 +113,14 @@ export const useTodoStore = create<TodoStore>()(
       addTask: (title, listId, priority = 'medium', workload, dueDate, dueTime, isRecurring = false) => {
         const id = uuidv4();
         const now = new Date().toISOString();
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
         const newTask: Task = {
           id,
           title,
           priority,
           status: 'active',
           createdAt: now,
+          createdDate: todayStr,
           updatedAt: now,
           listId: listId || get().settings.defaultListId,
           subTasks: [],
@@ -298,10 +300,10 @@ export const useTodoStore = create<TodoStore>()(
         const today = startOfDay(new Date());
         const todayStr = format(today, 'yyyy-MM-dd');
         
+        // 更新昨天未完成任务：标记为已错过（红叉），但保留原记录
         const updatedTasks = tasks.map((task) => {
           const pendingTask = pendingTransferTasks.find((pt) => pt.id === task.id);
           if (pendingTask) {
-            // 标记原任务为未完成
             return { ...task, missed: true };
           }
           return task;

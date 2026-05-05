@@ -8,7 +8,7 @@ import { TaskItem } from '@/components/TaskItem';
 import { TaskEditModal } from '@/components/TaskEditModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { TransferTasksModal } from '@/components/TransferTasksModal';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths, startOfDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 // 番茄钟配置
@@ -61,12 +61,28 @@ export default function Home() {
   
   // 获取当前列表的任务
   const getCurrentTasks = (): Task[] => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const todayStart = startOfDay(new Date());
+    const yesterdayStart = addDays(todayStart, -1);
+    const yesterdayEnd = addDays(todayStart, 0);
+    yesterdayEnd.setHours(23, 59, 59, 999);
+
     if (currentListId === 'all' || !lists.find(l => l.id === currentListId)?.isDefault) {
-      const listTasks = currentListId === 'all' 
+      const listTasks = currentListId === 'all'
         ? tasks.filter((t) => !t.isArchived)
         : getTasksByList(currentListId);
-      
-      return [...listTasks].sort((a, b) => {
+
+      // 过滤已完成任务：只显示当天创建且当天完成的任务
+      const filteredListTasks = listTasks.filter((task) => {
+        // 如果是已完成的任务
+        if (task.status === 'completed') {
+          // 只显示今天创建的任务
+          return task.createdDate === today;
+        }
+        return true;
+      });
+
+      return [...filteredListTasks].sort((a, b) => {
         if (a.status !== b.status) {
           return a.status === 'active' ? -1 : 1;
         }
@@ -79,7 +95,7 @@ export default function Home() {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     }
-    
+
     switch (currentListId) {
       case 'today':
         return getTodayTasks();
@@ -88,7 +104,12 @@ export default function Home() {
       case 'important':
         return getImportantTasks();
       case 'completed':
-        return getCompletedTasks();
+        // 已完成列表：只显示今天创建的已完成任务
+        return tasks.filter((t) =>
+          !t.isArchived &&
+          t.status === 'completed' &&
+          t.createdDate === today
+        );
       default:
         return getTasksByList(currentListId);
     }

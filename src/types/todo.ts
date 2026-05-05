@@ -18,6 +18,7 @@ export interface Task {
   dueTime?: string;
   workload?: Workload;
   createdAt: string;
+  createdDate: string; // 任务创建日期，格式 yyyy-MM-dd，用于判断任务是否当天创建
   updatedAt: string;
   completedAt?: string;
   listId: string;
