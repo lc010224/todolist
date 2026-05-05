@@ -18,6 +18,7 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
   
   const getTaskCount = (listId: string) => {
     switch (listId) {
+      case 'calendar':
       case 'all':
         return tasks.filter((t) => t.status === 'active' && !t.isArchived).length;
       case 'today':
@@ -31,7 +32,7 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
           const due = new Date(t.dueDate);
           return due >= today && due < tomorrow;
         }).length;
-      case 'upcoming':
+      case 'pomodoro':
         const weekStart = new Date();
         weekStart.setHours(0, 0, 0, 0);
         const weekEnd = new Date(weekStart);
@@ -42,10 +43,8 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
           const due = new Date(t.dueDate);
           return due >= weekStart && due <= weekEnd;
         }).length;
-      case 'important':
-        return tasks.filter((t) => t.priority === 'high' && t.status === 'active' && !t.isArchived).length;
-      case 'completed':
-        return tasks.filter((t) => t.status === 'completed' && !t.isArchived).length;
+      case 'settings':
+        return 0;
       default:
         return tasks.filter((t) => t.listId === listId && !t.isArchived).length;
     }

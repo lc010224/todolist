@@ -58,6 +58,8 @@ export default function Home() {
   const isCalendarPage = currentListId === 'calendar';
   // 判断是否是番茄专注页面
   const isPomodoroPage = currentListId === 'pomodoro';
+  // 判断是否是设置页面
+  const isSettingsPage = currentListId === 'settings';
   
   // 获取当前列表的任务
   const getCurrentTasks = (): Task[] => {
@@ -671,7 +673,304 @@ export default function Home() {
     </div>
   );
   
-  // 渲染普通列表视图
+  // 渲染设置页面
+  const RenderSettingsPage = () => {
+    const settings = useTodoStore((state) => state.settings);
+    const setTheme = useTodoStore((state) => state.setTheme);
+    const toggleNotifications = useTodoStore((state) => state.toggleNotifications);
+    const toggleHaptics = useTodoStore((state) => state.toggleHaptics);
+    const tasks = useTodoStore((state) => state.tasks);
+
+    const totalTasks = tasks.filter(t => !t.isArchived).length;
+    const completedTasks = tasks.filter(t => t.status === 'completed' && !t.isArchived).length;
+    const activeTasks = totalTasks - completedTasks;
+    const recurringTasks = tasks.filter(t => t.isRecurring && !t.isArchived).length;
+
+    return (
+      <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-lg mx-auto p-4 space-y-4">
+          {/* 用户信息卡片 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-bold">
+                U
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">待办清单用户</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">免费版</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 统计数据 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">任务统计</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{activeTasks}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">进行中</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{completedTasks}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">已完成</div>
+              </div>
+              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalTasks}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">总任务</div>
+              </div>
+              <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{recurringTasks}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">习惯任务</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 外观设置 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">外观</h3>
+            </div>
+            <div className="p-2">
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                    <span className="text-lg">🌙</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">深色模式</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">跟随系统</div>
+                  </div>
+                </div>
+                <select
+                  value={settings.theme}
+                  onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
+                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 border-none rounded-lg text-gray-700 dark:text-gray-300"
+                >
+                  <option value="system">跟随系统</option>
+                  <option value="light">浅色</option>
+                  <option value="dark">深色</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 番茄钟设置 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">番茄钟</h3>
+            </div>
+            <div className="p-2 space-y-1">
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <span className="text-lg">🍅</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">专注时长</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">25 分钟</div>
+                  </div>
+                </div>
+                <span className="text-sm text-blue-500">25 分钟</span>
+              </div>
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <span className="text-lg">☕</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">短休息时长</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">5 分钟</div>
+                  </div>
+                </div>
+                <span className="text-sm text-blue-500">5 分钟</span>
+              </div>
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <span className="text-lg">🌴</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">长休息时长</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">15 分钟</div>
+                  </div>
+                </div>
+                <span className="text-sm text-blue-500">15 分钟</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 通知与反馈 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">通知与反馈</h3>
+            </div>
+            <div className="p-2 space-y-1">
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <span className="text-lg">🔔</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">提醒通知</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">任务到期提醒</div>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleNotifications}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    settings.enableNotifications ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      settings.enableNotifications ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center">
+                    <span className="text-lg">📳</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">振动反馈</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">操作时的触觉反馈</div>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleHaptics}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    settings.enableHaptics ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      settings.enableHaptics ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <span className="text-lg">🔊</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-white">番茄钟提示音</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">专注结束提醒</div>
+                  </div>
+                </div>
+                <button className="relative w-12 h-6 rounded-full bg-blue-500">
+                  <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow translate-x-6" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 数据管理 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">数据管理</h3>
+            </div>
+            <div className="p-2 space-y-1">
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <span className="text-lg">📤</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">导出数据</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">备份任务列表</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <span className="text-lg">📥</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">导入数据</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">从备份恢复</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <span className="text-lg">🗑️</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-red-600 dark:text-red-400">清除已完成</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">删除所有已完成任务</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* 关于 */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">关于</h3>
+            </div>
+            <div className="p-2 space-y-1">
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-lg">ℹ️</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">版本信息</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">v1.0.5</div>
+                </div>
+              </button>
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-lg">⭐</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">给我们评分</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">喜欢我们的应用？</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-lg">💬</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">意见反馈</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">帮助我们改进</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-lg">📄</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800 dark:text-white">隐私政策</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">了解数据使用</div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderNormalPage = () => (
     <div className="flex-1 flex flex-col pb-24 md:pb-4">
       {/* 可滚动的日历区域 */}
@@ -899,19 +1198,20 @@ export default function Home() {
             </button>
             
             <button
-              onClick={() => setCurrentListId('completed')}
+              onClick={() => setCurrentListId('settings')}
               className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
-                         ${currentListId === 'completed' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}
+                         ${currentListId === 'settings' ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}
             >
-              <span className="text-lg">✓</span>
-              <span className="text-[10px] mt-0.5">已完成</span>
+              <span className="text-lg">⚙️</span>
+              <span className="text-[10px] mt-0.5">设置</span>
             </button>
           </div>
         </nav>
         
         {/* 内容区域 */}
-        {isPomodoroPage ? renderPomodoroPage() : 
-         isCalendarPage ? renderCalendarPage() : 
+        {isPomodoroPage ? renderPomodoroPage() :
+         isCalendarPage ? renderCalendarPage() :
+         isSettingsPage ? <RenderSettingsPage /> :
          renderNormalPage()}
         
         {/* 右下角添加按钮 - 不显示在番茄页面 */}
