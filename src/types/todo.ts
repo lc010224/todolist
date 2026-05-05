@@ -58,6 +58,11 @@ export interface AppSettings {
   defaultListId: string;
   enableNotifications: boolean;
   enableHaptics: boolean;
+  // 番茄钟设置
+  pomodoroWorkDuration: number; // 专注时长（分钟）
+  pomodoroShortBreak: number; // 短休息时长（分钟）
+  pomodoroLongBreak: number; // 长休息时长（分钟）
+  pomodoroSoundEnabled: boolean; // 番茄钟提示音
 }
 
 // 默认列表

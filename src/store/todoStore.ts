@@ -17,6 +17,8 @@ interface TodoStore {
   setDefaultList: (listId: string) => void;
   toggleNotifications: () => void;
   toggleHaptics: () => void;
+  setPomodoroSettings: (settings: { workDuration?: number; shortBreak?: number; longBreak?: number; soundEnabled?: boolean }) => void;
+  togglePomodoroSound: () => void;
   
   // 列表操作
   addList: (name: string, icon: string, color: string) => void;
@@ -49,6 +51,11 @@ interface TodoStore {
   confirmTransferTasks: () => void;
   dismissTransferTasks: () => void;
   generateRecurringTasks: (today: Date) => void;
+  
+  // 数据管理
+  exportData: () => string;
+  importData: (jsonStr: string) => boolean;
+  clearCompletedTasks: () => void;
 }
 
 export const useTodoStore = create<TodoStore>()(
@@ -61,27 +68,39 @@ export const useTodoStore = create<TodoStore>()(
         defaultListId: 'all',
         enableNotifications: true,
         enableHaptics: true,
+        pomodoroWorkDuration: 25,
+        pomodoroShortBreak: 5,
+        pomodoroLongBreak: 15,
+        pomodoroSoundEnabled: true,
       },
       lastCheckedDate: '',
       pendingTransferTasks: [],
-      
+
       // 设置操作
       setTheme: (theme) => set((state) => ({
         settings: { ...state.settings, theme }
       })),
-      
+
       setDefaultList: (listId) => set((state) => ({
         settings: { ...state.settings, defaultListId: listId }
       })),
-      
+
       toggleNotifications: () => set((state) => ({
         settings: { ...state.settings, enableNotifications: !state.settings.enableNotifications }
       })),
-      
+
       toggleHaptics: () => set((state) => ({
         settings: { ...state.settings, enableHaptics: !state.settings.enableHaptics }
       })),
-      
+
+      setPomodoroSettings: (settings) => set((state) => ({
+        settings: { ...state.settings, ...settings }
+      })),
+
+      togglePomodoroSound: () => set((state) => ({
+        settings: { ...state.settings, pomodoroSoundEnabled: !state.settings.pomodoroSoundEnabled }
+      })),
+
       // 列表操作
       addList: (name, icon, color) => {
         const newList: TaskList = {
@@ -368,6 +387,54 @@ export const useTodoStore = create<TodoStore>()(
         if (newTasks.length > 0) {
           set((state) => ({ tasks: [...state.tasks, ...newTasks] }));
         }
+      },
+
+      // 导出数据
+      exportData: () => {
+        const state = get();
+        const data = {
+          tasks: state.tasks,
+          lists: state.lists,
+          settings: state.settings,
+          exportedAt: new Date().toISOString(),
+          version: '1.0.6',
+        };
+        return JSON.stringify(data, null, 2);
+      },
+
+      // 导入数据
+      importData: (jsonStr: string) => {
+        try {
+          const data = JSON.parse(jsonStr);
+          if (data.tasks && Array.isArray(data.tasks)) {
+            set({ tasks: data.tasks });
+          }
+          if (data.lists && Array.isArray(data.lists)) {
+            // 合并清单，保留新清单
+            const state = get();
+            const existingListIds = new Set(state.lists.map(l => l.id));
+            const newLists = data.lists.filter((l: TaskList) => !existingListIds.has(l.id));
+            if (newLists.length > 0) {
+              set({ lists: [...state.lists, ...newLists] });
+            }
+          }
+          if (data.settings) {
+            set((state) => ({
+              settings: { ...state.settings, ...data.settings }
+            }));
+          }
+          return true;
+        } catch (e) {
+          console.error('Import failed:', e);
+          return false;
+        }
+      },
+
+      // 清除已完成任务
+      clearCompletedTasks: () => {
+        set((state) => ({
+          tasks: state.tasks.filter((task) => task.status !== 'completed')
+        }));
       },
     }),
     {

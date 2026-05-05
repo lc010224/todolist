@@ -679,12 +679,87 @@ export default function Home() {
     const setTheme = useTodoStore((state) => state.setTheme);
     const toggleNotifications = useTodoStore((state) => state.toggleNotifications);
     const toggleHaptics = useTodoStore((state) => state.toggleHaptics);
+    const setPomodoroSettings = useTodoStore((state) => state.setPomodoroSettings);
+    const togglePomodoroSound = useTodoStore((state) => state.togglePomodoroSound);
+    const exportData = useTodoStore((state) => state.exportData);
+    const importData = useTodoStore((state) => state.importData);
+    const clearCompletedTasks = useTodoStore((state) => state.clearCompletedTasks);
     const tasks = useTodoStore((state) => state.tasks);
 
     const totalTasks = tasks.filter(t => !t.isArchived).length;
     const completedTasks = tasks.filter(t => t.status === 'completed' && !t.isArchived).length;
     const activeTasks = totalTasks - completedTasks;
     const recurringTasks = tasks.filter(t => t.isRecurring && !t.isArchived).length;
+
+    // 导出数据
+    const handleExport = () => {
+      const data = exportData();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `todo-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    // 导入数据
+    const handleImport = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const content = event.target?.result as string;
+            if (importData(content)) {
+              alert('数据导入成功！');
+              window.location.reload();
+            } else {
+              alert('数据导入失败，请检查文件格式！');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
+    };
+
+    // 清除已完成
+    const handleClearCompleted = () => {
+      if (completedTasks === 0) {
+        alert('没有已完成的任务需要清除');
+        return;
+      }
+      if (confirm(`确定要清除所有 ${completedTasks} 个已完成任务吗？此操作不可恢复！`)) {
+        clearCompletedTasks();
+        alert('已完成任务已清除');
+      }
+    };
+
+    // 调整时间
+    const [showDurationPicker, setShowDurationPicker] = useState<'work' | 'shortBreak' | 'longBreak' | null>(null);
+    const [tempDuration, setTempDuration] = useState(25);
+
+    const openDurationPicker = (type: 'work' | 'shortBreak' | 'longBreak', currentValue: number) => {
+      setTempDuration(currentValue);
+      setShowDurationPicker(type);
+    };
+
+    const saveDuration = (type: 'work' | 'shortBreak' | 'longBreak') => {
+      if (type === 'work') {
+        setPomodoroSettings({ workDuration: tempDuration });
+      } else if (type === 'shortBreak') {
+        setPomodoroSettings({ shortBreak: tempDuration });
+      } else {
+        setPomodoroSettings({ longBreak: tempDuration });
+      }
+      setShowDurationPicker(null);
+    };
 
     return (
       <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
@@ -760,42 +835,51 @@ export default function Home() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">番茄钟</h3>
             </div>
             <div className="p-2 space-y-1">
-              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+              <button
+                onClick={() => openDurationPicker('work', settings.pomodoroWorkDuration)}
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                     <span className="text-lg">🍅</span>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-gray-800 dark:text-white">专注时长</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">25 分钟</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">工作专注时间</div>
                   </div>
                 </div>
-                <span className="text-sm text-blue-500">25 分钟</span>
-              </div>
-              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <span className="text-sm text-blue-500 font-medium">{settings.pomodoroWorkDuration} 分钟</span>
+              </button>
+              <button
+                onClick={() => openDurationPicker('shortBreak', settings.pomodoroShortBreak)}
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                     <span className="text-lg">☕</span>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-gray-800 dark:text-white">短休息时长</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">5 分钟</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">工作间休息</div>
                   </div>
                 </div>
-                <span className="text-sm text-blue-500">5 分钟</span>
-              </div>
-              <div className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl">
+                <span className="text-sm text-blue-500 font-medium">{settings.pomodoroShortBreak} 分钟</span>
+              </button>
+              <button
+                onClick={() => openDurationPicker('longBreak', settings.pomodoroLongBreak)}
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                     <span className="text-lg">🌴</span>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-gray-800 dark:text-white">长休息时长</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">15 分钟</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">周期结束休息</div>
                   </div>
                 </div>
-                <span className="text-sm text-blue-500">15 分钟</span>
-              </div>
+                <span className="text-sm text-blue-500 font-medium">{settings.pomodoroLongBreak} 分钟</span>
+              </button>
             </div>
           </div>
 
@@ -861,8 +945,17 @@ export default function Home() {
                     <div className="text-xs text-gray-500 dark:text-gray-400">专注结束提醒</div>
                   </div>
                 </div>
-                <button className="relative w-12 h-6 rounded-full bg-blue-500">
-                  <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow translate-x-6" />
+                <button
+                  onClick={togglePomodoroSound}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    settings.pomodoroSoundEnabled ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      settings.pomodoroSoundEnabled ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
                 </button>
               </div>
             </div>
@@ -874,31 +967,40 @@ export default function Home() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">数据管理</h3>
             </div>
             <div className="p-2 space-y-1">
-              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+              <button
+                onClick={handleExport}
+                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
                 <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                   <span className="text-lg">📤</span>
                 </div>
                 <div className="flex-1 text-left">
                   <div className="text-sm font-medium text-gray-800 dark:text-white">导出数据</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">备份任务列表</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">备份任务列表到文件</div>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+              <button
+                onClick={handleImport}
+                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
+              >
                 <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                   <span className="text-lg">📥</span>
                 </div>
                 <div className="flex-1 text-left">
                   <div className="text-sm font-medium text-gray-800 dark:text-white">导入数据</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">从备份恢复</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">从备份文件恢复</div>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              <button className="w-full flex items-center gap-3 p-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+              <button
+                onClick={handleClearCompleted}
+                className="w-full flex items-center gap-3 p-3 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+              >
                 <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                   <span className="text-lg">🗑️</span>
                 </div>
@@ -919,15 +1021,15 @@ export default function Home() {
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">关于</h3>
             </div>
             <div className="p-2 space-y-1">
-              <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
+              <div className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                 <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                   <span className="text-lg">ℹ️</span>
                 </div>
                 <div className="flex-1 text-left">
                   <div className="text-sm font-medium text-gray-800 dark:text-white">版本信息</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">v1.0.5</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">v1.0.6</div>
                 </div>
-              </button>
+              </div>
               <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
                 <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                   <span className="text-lg">⭐</span>
@@ -967,6 +1069,52 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* 时长选择弹窗 */}
+        {showDurationPicker && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDurationPicker(null)}>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-center">设置时长</h3>
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <button
+                  onClick={() => setTempDuration(Math.max(1, tempDuration - 5))}
+                  className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl font-bold"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  value={tempDuration}
+                  onChange={(e) => setTempDuration(Math.max(1, Math.min(120, parseInt(e.target.value) || 1)))}
+                  className="w-20 h-12 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white"
+                  min="1"
+                  max="120"
+                />
+                <button
+                  onClick={() => setTempDuration(Math.min(120, tempDuration + 5))}
+                  className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl font-bold"
+                >
+                  +
+                </button>
+              </div>
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-4">分钟</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDurationPicker(null)}
+                  className="flex-1 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => saveDuration(showDurationPicker)}
+                  className="flex-1 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600"
+                >
+                  确定
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
