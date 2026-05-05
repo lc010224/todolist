@@ -60,12 +60,12 @@ export interface AppSettings {
   enableHaptics: boolean;
 }
 
-// 默认列表 - 与底边栏顺序一致：收藏、清单、番茄、已完成
+// 默认列表
 export const defaultLists: TaskList[] = [
   {
-    id: 'important',
-    name: '收藏',
-    icon: '⭐',
+    id: 'calendar',
+    name: '日历',
+    icon: '📅',
     color: '#ef4444',
     createdAt: new Date().toISOString(),
     order: 0,

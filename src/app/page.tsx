@@ -22,7 +22,7 @@ const POMODORO_CONFIG = {
 type TimerMode = 'work' | 'shortBreak' | 'longBreak' | 'custom';
 
 export default function Home() {
-  const [currentListId, setCurrentListId] = useState('important');
+  const [currentListId, setCurrentListId] = useState('calendar');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -54,8 +54,8 @@ export default function Home() {
   
   const currentList = lists.find((l) => l.id === currentListId);
   
-  // 判断是否是收藏页面
-  const isImportantPage = currentListId === 'important';
+  // 判断是否是日历页面
+  const isCalendarPage = currentListId === 'calendar';
   // 判断是否是番茄专注页面
   const isPomodoroPage = currentListId === 'pomodoro';
   
@@ -67,16 +67,33 @@ export default function Home() {
     const yesterdayEnd = addDays(todayStart, 0);
     yesterdayEnd.setHours(23, 59, 59, 999);
 
+    // 日历页面：显示所有未完成任务和当天创建的已完成任务
+    if (currentListId === 'calendar') {
+      const calendarTasks = tasks.filter((t) => !t.isArchived);
+      const filteredTasks = calendarTasks.filter((task) => {
+        if (task.status === 'completed') {
+          return task.createdDate === today;
+        }
+        return true;
+      });
+      return [...filteredTasks].sort((a, b) => {
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+
     if (currentListId === 'all' || !lists.find(l => l.id === currentListId)?.isDefault) {
       const listTasks = currentListId === 'all'
         ? tasks.filter((t) => !t.isArchived)
         : getTasksByList(currentListId);
 
-      // 过滤已完成任务：只显示当天创建且当天完成的任务
+      // 过滤已完成任务：只显示当天创建的任务
       const filteredListTasks = listTasks.filter((task) => {
-        // 如果是已完成的任务
         if (task.status === 'completed') {
-          // 只显示今天创建的任务
           return task.createdDate === today;
         }
         return true;
@@ -101,10 +118,7 @@ export default function Home() {
         return getTodayTasks();
       case 'pomodoro':
         return getUpcomingTasks();
-      case 'important':
-        return getImportantTasks();
       case 'completed':
-        // 已完成列表：只显示今天创建的已完成任务
         return tasks.filter((t) =>
           !t.isArchived &&
           t.status === 'completed' &&
@@ -318,9 +332,68 @@ export default function Home() {
   const selectedDateStr = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`;
   const weekDayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
   const selectedWeekDay = weekDayNames[selectedDate.getDay()];
-  
-  // 渲染收藏页面的日历视图
-  const renderImportantPage = () => (
+
+  // 获取农历日期（简化版）
+  const getLunarDate = (date: Date): string => {
+    const lunarMonths = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+    const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                       '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                       '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+    const month = date.getMonth();
+    const day = Math.min(date.getDate() - 1, 29);
+    return `${lunarMonths[month]}月${lunarDays[day]}`;
+  };
+
+  // 获取节假日信息
+  const getHolidayInfo = (date: Date): { name: string; color: string } | null => {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = date.getDay();
+
+    const holidays: Record<string, { name: string; color: string }> = {
+      '1-1': { name: '元旦', color: 'bg-red-500' },
+      '2-14': { name: '情人节', color: 'bg-pink-500' },
+      '3-8': { name: '妇女节', color: 'bg-purple-500' },
+      '3-12': { name: '植树节', color: 'bg-green-500' },
+      '4-1': { name: '愚人节', color: 'bg-orange-500' },
+      '4-5': { name: '清明', color: 'bg-green-600' },
+      '5-1': { name: '劳动节', color: 'bg-red-500' },
+      '5-4': { name: '青年节', color: 'bg-blue-500' },
+      '6-1': { name: '儿童节', color: 'bg-pink-400' },
+      '7-1': { name: '建党节', color: 'bg-red-600' },
+      '8-1': { name: '建军节', color: 'bg-green-700' },
+      '9-10': { name: '教师节', color: 'bg-blue-600' },
+      '10-1': { name: '国庆', color: 'bg-red-500' },
+      '11-11': { name: '双十一', color: 'bg-orange-500' },
+      '12-25': { name: '圣诞节', color: 'bg-red-600' },
+    };
+
+    const key = `${month}-${day}`;
+    if (holidays[key]) return holidays[key];
+
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return { name: dayOfWeek === 0 ? '周日' : '周六', color: 'bg-gray-400' };
+    }
+
+    return null;
+  };
+
+  // 获取某天的任务详情
+  const getTasksForDate = (date: Date) => {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    return tasks.filter(t => {
+      if (!t.dueDate || t.isArchived) return false;
+      const due = new Date(t.dueDate);
+      return due >= dayStart && due <= dayEnd;
+    });
+  };
+
+  // 渲染日历页面的丰富视图
+  const renderCalendarPage = () => (
     <div className="flex-1 overflow-y-auto pb-24 md:pb-4">
       {/* 日历 */}
       <div className="bg-[#f3f3f3] dark:bg-gray-800 p-4">
@@ -757,7 +830,7 @@ export default function Home() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {isPomodoroPage 
                     ? sessions > 0 ? `${sessions} 个番茄完成` : '开始你的专注'
-                    : isImportantPage ? `${selectedDateTasks.length} 个任务` : `${currentTasks.length} 个任务`}
+                    : isCalendarPage ? `${getTasksForDate(selectedDate).length} 个任务` : `${currentTasks.length} 个任务`}
                 </p>
               </div>
             </div>
@@ -779,7 +852,7 @@ export default function Home() {
           </div>
           
           {/* 搜索框 */}
-          {showSearch && !isImportantPage && !isPomodoroPage && (
+          {showSearch && !isCalendarPage && !isPomodoroPage && (
             <div className="px-4 pb-4">
               <input
                 type="text"
@@ -797,12 +870,12 @@ export default function Home() {
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-40">
           <div className="flex justify-around py-2">
             <button
-              onClick={() => setCurrentListId('important')}
+              onClick={() => setCurrentListId('calendar')}
               className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
-                         ${currentListId === 'important' ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400'}`}
+                         ${currentListId === 'calendar' ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}
             >
-              <span className="text-lg">⭐</span>
-              <span className="text-[10px] mt-0.5">收藏</span>
+              <span className="text-lg">📅</span>
+              <span className="text-[10px] mt-0.5">日历</span>
             </button>
             
             <button
@@ -836,7 +909,7 @@ export default function Home() {
         
         {/* 内容区域 */}
         {isPomodoroPage ? renderPomodoroPage() : 
-         isImportantPage ? renderImportantPage() : 
+         isCalendarPage ? renderCalendarPage() : 
          renderNormalPage()}
         
         {/* 右下角添加按钮 - 不显示在番茄页面 */}
