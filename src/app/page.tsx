@@ -1411,7 +1411,7 @@ export default function Home() {
         {/* 内容区域 */}
         {isPomodoroPage ? renderPomodoroPage() :
          isCalendarPage ? renderCalendarPage() :
-         isSettingsPage ? <div ref={settingsScrollRef} id="settings-page" className="overflow-y-auto"><RenderSettingsPage /></div> :
+         isSettingsPage ? <div id="settings-page" className="overflow-y-auto"><RenderSettingsPage /></div> :
          renderNormalPage()}
         
         {/* 右下角添加按钮 - 只在清单列表页面显示 */}
