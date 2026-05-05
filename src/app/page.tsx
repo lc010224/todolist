@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTodoStore } from '@/store/todoStore';
 import { Task } from '@/types/todo';
 import { Sidebar } from '@/components/Sidebar';
@@ -42,7 +42,15 @@ export default function Home() {
 
   const lists = useTodoStore((state) => state.lists);
   const tasks = useTodoStore((state) => state.tasks);
-  const settings = useTodoStore((state) => state.settings);
+  const settingsRaw = useTodoStore((state) => state.settings);
+  // 添加默认值回退，防止 localStorage 中没有这些字段
+  const settings = useMemo(() => ({
+    ...settingsRaw,
+    pomodoroWorkDuration: settingsRaw.pomodoroWorkDuration || 25,
+    pomodoroShortBreak: settingsRaw.pomodoroShortBreak || 5,
+    pomodoroLongBreak: settingsRaw.pomodoroLongBreak || 15,
+    pomodoroSoundEnabled: settingsRaw.pomodoroSoundEnabled ?? true,
+  }), [settingsRaw]);
   const getTasksByList = useTodoStore((state) => state.getTasksByList);
   const getTodayTasks = useTodoStore((state) => state.getTodayTasks);
   const getUpcomingTasks = useTodoStore((state) => state.getUpcomingTasks);
@@ -696,7 +704,15 @@ export default function Home() {
   
   // 渲染设置页面
   const RenderSettingsPage = () => {
-    const settings = useTodoStore((state) => state.settings);
+    const settingsRaw = useTodoStore((state) => state.settings);
+    // 添加默认值回退，防止 localStorage 中没有这些字段
+    const settings = {
+      ...settingsRaw,
+      pomodoroWorkDuration: settingsRaw.pomodoroWorkDuration || 25,
+      pomodoroShortBreak: settingsRaw.pomodoroShortBreak || 5,
+      pomodoroLongBreak: settingsRaw.pomodoroLongBreak || 15,
+      pomodoroSoundEnabled: settingsRaw.pomodoroSoundEnabled ?? true,
+    };
     const setTheme = useTodoStore((state) => state.setTheme);
     const toggleNotifications = useTodoStore((state) => state.toggleNotifications);
     const toggleHaptics = useTodoStore((state) => state.toggleHaptics);
