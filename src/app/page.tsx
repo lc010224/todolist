@@ -32,15 +32,25 @@ export default function Home() {
   
   // 番茄钟状态
   const [isRunning, setIsRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(POMODORO_CONFIG.work);
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [mode, setMode] = useState<TimerMode>('work');
   const [sessions, setSessions] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
-  
+  const [initialized, setInitialized] = useState(false);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
+  // 初始化番茄钟时间
+  useEffect(() => {
+    if (!initialized && settings) {
+      setTimeLeft(settings.pomodoroWorkDuration * 60);
+      setInitialized(true);
+    }
+  }, [settings, initialized]);
+
   const lists = useTodoStore((state) => state.lists);
   const tasks = useTodoStore((state) => state.tasks);
+  const settings = useTodoStore((state) => state.settings);
   const getTasksByList = useTodoStore((state) => state.getTasksByList);
   const getTodayTasks = useTodoStore((state) => state.getTodayTasks);
   const getUpcomingTasks = useTodoStore((state) => state.getUpcomingTasks);
@@ -167,7 +177,13 @@ export default function Home() {
   const [showCustomModal, setShowCustomModal] = useState(false);
 
   const getTotalTime = (m: TimerMode) => {
-    return m === 'custom' ? customTime * 60 : POMODORO_CONFIG[m as keyof typeof POMODORO_CONFIG];
+    if (m === 'custom') return customTime * 60;
+    switch (m) {
+      case 'work': return settings.pomodoroWorkDuration * 60;
+      case 'shortBreak': return settings.pomodoroShortBreak * 60;
+      case 'longBreak': return settings.pomodoroLongBreak * 60;
+      default: return settings.pomodoroWorkDuration * 60;
+    }
   };
 
   const switchMode = useCallback((newMode: TimerMode, customMinutes?: number) => {
@@ -175,14 +191,19 @@ export default function Home() {
     if (newMode === 'custom' && customMinutes) {
       setTimeLeft(customMinutes * 60);
     } else {
-      setTimeLeft(POMODORO_CONFIG[newMode as keyof typeof POMODORO_CONFIG]);
+      switch (newMode) {
+        case 'work': setTimeLeft(settings.pomodoroWorkDuration * 60); break;
+        case 'shortBreak': setTimeLeft(settings.pomodoroShortBreak * 60); break;
+        case 'longBreak': setTimeLeft(settings.pomodoroLongBreak * 60); break;
+        default: setTimeLeft(settings.pomodoroWorkDuration * 60);
+      }
     }
     setIsRunning(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, []);
+  }, [settings]);
   
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
@@ -200,8 +221,8 @@ export default function Home() {
             if (mode === 'work') {
               const newSessions = sessions + 1;
               setSessions(newSessions);
-              setTotalMinutes((prev) => prev + POMODORO_CONFIG.work / 60);
-              if (newSessions % POMODORO_CONFIG.longBreakInterval === 0) {
+              setTotalMinutes((prev) => prev + settings.pomodoroWorkDuration);
+              if (newSessions % 4 === 0) {
                 switchMode('longBreak');
               } else {
                 switchMode('shortBreak');
