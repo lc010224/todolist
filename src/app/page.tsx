@@ -8,6 +8,7 @@ import { TaskItem } from '@/components/TaskItem';
 import { TaskEditModal } from '@/components/TaskEditModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { TransferTasksModal } from '@/components/TransferTasksModal';
+import { LoginButton } from '@/components/LoginButton';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths, startOfDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -818,15 +819,7 @@ export default function Home() {
         <div className="max-w-lg mx-auto p-4 space-y-4">
           {/* 用户信息卡片 */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-2xl font-bold">
-                U
-              </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">待办清单用户</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">免费版</p>
-              </div>
-            </div>
+            <LoginButton />
           </div>
 
           {/* 统计数据 */}
