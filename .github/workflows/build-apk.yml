@@ -67,7 +67,7 @@ jobs:
           KEYSTORE_FILE="android/app/release.keystore"
           KEYSTORE_B64="${{ secrets.KEYSTORE_BASE64 }}"
 
-          if [ -n "$KEYSTORE_B64" ] && [ -s <(echo "$KEYSTORE_B64") ]; then
+          if [ -n "$KEYSTORE_B64" ] && [ ${#KEYSTORE_B64} -gt 100 ]; then
             echo "Restoring keystore from GitHub Secret..."
             echo "$KEYSTORE_B64" | base64 -d > "$KEYSTORE_FILE"
             echo "keystore_source=secret" >> $GITHUB_OUTPUT
@@ -113,12 +113,10 @@ jobs:
           if grep -q "KEYSTORE_PATH" android/gradle.properties; then
             echo "Signing already configured"
           else
-            cat >> android/gradle.properties << EOF
-KEYSTORE_PATH=app/release.keystore
-KEYSTORE_PASSWORD=todolist123
-KEY_ALIAS=release
-KEY_PASSWORD=todolist123
-EOF
+            echo "KEYSTORE_PATH=app/release.keystore" >> android/gradle.properties
+            echo "KEYSTORE_PASSWORD=todolist123" >> android/gradle.properties
+            echo "KEY_ALIAS=release" >> android/gradle.properties
+            echo "KEY_PASSWORD=todolist123" >> android/gradle.properties
           fi
 
       - name: Configure debug build to use release signing
