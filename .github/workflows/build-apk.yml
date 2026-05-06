@@ -61,16 +61,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Generate or restore signing key
+      - name: Generate signing key (first time only)
         id: keystore
         run: |
           KEYSTORE_FILE="android/app/release.keystore"
           KEYSTORE_B64="${{ secrets.KEYSTORE_BASE64 }}"
 
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "Restoring existing keystore from secret..."
+          if [ -n "$KEYSTORE_B64" ] && [ -s <(echo "$KEYSTORE_B64") ]; then
+            echo "Restoring keystore from GitHub Secret..."
             echo "$KEYSTORE_B64" | base64 -d > "$KEYSTORE_FILE"
-            echo "keystore_restored=true" >> $GITHUB_OUTPUT
+            echo "keystore_source=secret" >> $GITHUB_OUTPUT
           else
             echo "Generating new keystore..."
             keytool -genkeypair \
@@ -84,36 +84,50 @@ jobs:
               -storepass todolist123 \
               -keypass todolist123 \
               -dname "CN=todo-app, OU=todo, O=todo, L=beijing, ST=beijing, C=CN"
-            echo "keystore_restored=false" >> $GITHUB_OUTPUT
-            echo "new_keystore_generated=true" >> $GITHUB_OUTPUT
+            echo "keystore_source=generated" >> $GITHUB_OUTPUT
           fi
 
-      - name: Show new keystore (first time only)
-        if: steps.keystore.outputs.new_keystore_generated == 'true'
+          echo "keystore_created=true" >> $GITHUB_OUTPUT
+
+      - name: Save keystore for next builds
+        if: steps.keystore.outputs.keystore_source == 'generated'
         run: |
-          echo "==================================================================="
-          echo "NEW KEYSTORE GENERATED! Please add this secret to GitHub:"
-          echo "==================================================================="
+          echo "======================================================================"
+          echo "NEW KEYSTORE GENERATED - Save this for future builds!"
+          echo "======================================================================"
           KEYSTORE_B64=$(base64 -w 0 android/app/release.keystore)
           echo ""
-          echo "Secret name: KEYSTORE_BASE64"
-          echo "Secret value:"
+          echo "Add to GitHub Secrets (Settings > Secrets > Actions > New repository secret):"
+          echo ""
+          echo "Name: KEYSTORE_BASE64"
+          echo "Value:"
           echo "$KEYSTORE_B64"
           echo ""
-          echo "==================================================================="
-          echo "Add this in: GitHub > Settings > Secrets > Actions > New secret"
-          echo "==================================================================="
+          echo "======================================================================"
+          echo "After adding the secret, this message won't appear again."
+          echo "======================================================================"
           echo "keystore_base64::$KEYSTORE_B64"
 
-      - name: Configure signing
-        if: steps.keystore.outputs.keystore_restored == 'true' || steps.keystore.outputs.new_keystore_generated == 'true'
+      - name: Configure gradle signing
         run: |
-          cat >> android/gradle.properties << EOF
-          KEYSTORE_PATH=app/release.keystore
-          KEYSTORE_PASSWORD=todolist123
-          KEY_ALIAS=release
-          KEY_PASSWORD=todolist123
-          EOF
+          if grep -q "KEYSTORE_PATH" android/gradle.properties; then
+            echo "Signing already configured"
+          else
+            cat >> android/gradle.properties << EOF
+KEYSTORE_PATH=app/release.keystore
+KEYSTORE_PASSWORD=todolist123
+KEY_ALIAS=release
+KEY_PASSWORD=todolist123
+EOF
+          fi
+
+      - name: Configure debug build to use release signing
+        run: |
+          GRADLE_FILE="android/app/build.gradle"
+          if grep -q "signingConfigs.release" "$GRADLE_FILE"; then
+            echo "Configuring debug build to use release signing..."
+            sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' "$GRADLE_FILE"
+          fi
 
       - name: Build debug APK
         run: |
