@@ -10,6 +10,8 @@ import { AddTaskModal } from '@/components/AddTaskModal';
 import { TransferTasksModal } from '@/components/TransferTasksModal';
 import { SyncSettings } from '@/components/SyncSettings';
 import { UserSettings } from '@/components/UserSettings';
+import { NotesPage } from '@/components/NotesPage';
+import AuthPage from '@/components/AuthPage';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday, addMonths, subMonths, startOfDay, addDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -59,9 +61,11 @@ export default function Home() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showNoteTypeMenu, setShowNoteTypeMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDateDetail, setShowDateDetail] = useState(false);
   
   // 番茄钟状态
   const [isRunning, setIsRunning] = useState(false);
@@ -94,6 +98,7 @@ export default function Home() {
   const dismissTransferTasks = useTodoStore((state) => state.dismissTransferTasks);
   const checkAndProcessDailyTasks = useTodoStore((state) => state.checkAndProcessDailyTasks);
   const generateRecurringTasks = useTodoStore((state) => state.generateRecurringTasks);
+  const user = useTodoStore((state) => state.user);
 
   // 初始化番茄钟时间
   useEffect(() => {
@@ -109,6 +114,8 @@ export default function Home() {
   const isCalendarPage = currentListId === 'calendar';
   // 判断是否是番茄专注页面
   const isPomodoroPage = currentListId === 'pomodoro';
+  // 判断是否是记事本页面
+  const isNotesPage = currentListId === 'notes';
   // 判断是否是设置页面
   const isSettingsPage = currentListId === 'settings';
   
@@ -144,10 +151,14 @@ export default function Home() {
         ? tasks.filter((t) => !t.isArchived)
         : getTasksByList(currentListId);
 
-      // 过滤已完成任务：只显示当天创建的任务
+      // 过滤任务：显示选中日期的任务
+      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
       const filteredListTasks = listTasks.filter((task) => {
+        // 只显示选中日期的任务
+        if (task.dueDate !== selectedDateStr) return false;
+        // 已完成任务只显示当天创建的
         if (task.status === 'completed') {
-          return task.createdDate === today;
+          return task.createdDate === selectedDateStr;
         }
         return true;
       });
@@ -246,46 +257,63 @@ export default function Home() {
     }
   }, [settings]);
   
+  // 计时器核心逻辑
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            // 播放提示音
-            try {
-              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVcQNpHW+NueZVQ1Wq/w/5xkPzJJlub/o2hbOUmI1vTlpn5gMUOQ3PTrnnxjLj+P4fTvqYZnMD2L4fX0qoNrLzmI4vX4r4RxKjmD4fb8sYd0LzmA4ff+s4l3MzmA4Pf+tYx5NTl/4Pf+u5B8OTl+4Pf+vJJ+PTp94Pf+vpOQQEBA');
-              audio.play().catch(() => {});
-            } catch (e) {}
-
-            // 切换到下一个模式
-            if (mode === 'work') {
-              const newSessions = sessions + 1;
-              setSessions(newSessions);
-              setTotalMinutes((prev) => prev + settings.pomodoroWorkDuration);
-              if (newSessions % 4 === 0) {
-                switchMode('longBreak');
-              } else {
-                switchMode('shortBreak');
-              }
-            } else {
-              switchMode('work');
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (!isRunning) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
     }
-
+    
+    if (timeLeft <= 0) {
+      setIsRunning(false);
+      return;
+    }
+    
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          // 计时结束
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, mode, sessions, switchMode]);
+  }, [isRunning]);
+  
+  // 计时结束后的处理
+  useEffect(() => {
+    if (timeLeft === 0 && !isRunning) {
+      // 播放提示音
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVcQNpHW+NueZVQ1Wq/w/5xkPzJJlub/o2hbOUmI1vTlpn5gMUOQ3PTrnnxjLj+P4fTvqYZnMD2L4fX0qoNrLzmI4vX4r4RxKjmD4fb8sYd0LzmA4ff+s4l3MzmA4Pf+tYx5NTl/4Pf+u5B8OTl+4Pf+vJJ+PTp94Pf+vpOQQEBA');
+        audio.play().catch(() => {});
+      } catch (e) {}
+
+      // 切换到下一个模式并更新统计
+      if (mode === 'work') {
+        const newSessions = sessions + 1;
+        setSessions(newSessions);
+        setTotalMinutes((prev) => prev + settings.pomodoroWorkDuration);
+        if (newSessions % 4 === 0) {
+          switchMode('longBreak');
+        } else {
+          switchMode('shortBreak');
+        }
+      } else {
+        switchMode('work');
+      }
+    }
+  }, [timeLeft, isRunning]);
   
   // 每日检查：检查未完成任务和生成习惯任务
   useEffect(() => {
@@ -328,8 +356,17 @@ export default function Home() {
       const dayEnd = new Date(date);
       dayEnd.setHours(23, 59, 59, 999);
       
-      const count = tasks.filter(t => {
+      // 未完成任务数量（用于柱状图高度）
+      const pendingCount = tasks.filter(t => {
         if (t.status === 'completed' || t.isArchived) return false;
+        if (!t.dueDate) return false;
+        const due = new Date(t.dueDate);
+        return due >= dayStart && due <= dayEnd;
+      }).length;
+      
+      // 已完成任务数量（用于曲线点高度）
+      const completedCount = tasks.filter(t => {
+        if (t.status !== 'completed' || t.isArchived) return false;
         if (!t.dueDate) return false;
         const due = new Date(t.dueDate);
         return due >= dayStart && due <= dayEnd;
@@ -340,14 +377,15 @@ export default function Home() {
         day: date.getDate(),
         weekDay: weekDays[i],
         isToday: date.getTime() === today.getTime(),
-        count,
+        pendingCount,
+        completedCount,
       });
     }
     return days;
   };
   
   const weekDays = generateWeekDays();
-  const maxCount = Math.max(...weekDays.map(d => d.count), 1);
+  const maxCount = Math.max(...weekDays.map(d => Math.max(d.pendingCount, d.completedCount)), 1);
   
   // 生成日历数据
   const generateCalendarDays = () => {
@@ -458,109 +496,225 @@ export default function Home() {
     });
   };
 
+  // 农历信息（简化计算）
+  const getLunarCalendar = (date: Date): { lunarDay: string; zodiac: string } => {
+    const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+      '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+      '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+    const day = date.getDate();
+    const zodiacs = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+    
+    // 简化农历计算（以2026年为基准）
+    const baseYear = 2026;
+    const baseLunarStart = 2; // 假设正月初一是2月1日
+    const daysSinceLunar = Math.floor((date.getTime() - new Date(baseYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24));
+    const lunarDayIndex = (daysSinceLunar + 31) % 30;
+    
+    return {
+      lunarDay: lunarDays[Math.min(lunarDayIndex, 29)],
+      zodiac: zodiacs[(date.getFullYear() - 2008) % 12]
+    };
+  };
+
+  // 节假日数据
+  const holidays: Record<string, string> = {
+    '1-1': '元旦', '1-28': '小年', '1-29': '除夕', '1-30': '春节', '1-31': '初二',
+    '2-14': '情人节', '3-8': '妇女节', '3-12': '植树节', '4-4': '清明', '4-5': '清明',
+    '5-1': '劳动节', '5-3': '劳动节', '5-4': '青年节', '5-5': '立夏', '6-1': '儿童节',
+    '6-18': '端午节', '7-1': '建党节', '7-4': '小暑', '8-1': '建军节', '8-7': '立秋',
+    '9-10': '教师节', '9-23': '秋分', '10-1': '国庆', '10-2': '国庆', '10-3': '国庆',
+    '10-4': '中秋', '10-7': '重阳', '11-11': '光棍节', '12-22': '冬至', '12-25': '圣诞'
+  };
+
+  // 获取节假日名称
+  const getHolidayName = (date: Date): string | null => {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return holidays[`${month}-${day}`] || null;
+  };
+
+  // 判断是否是周末
+  const isWeekend = (date: Date): boolean => {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  };
+
   // 渲染日历页面的丰富视图
   const renderCalendarPage = () => (
-    <div className="flex-1 overflow-y-auto pb-24 md:pb-4">
-      {/* 日历 */}
-      <div className="bg-[#f3f3f3] dark:bg-gray-800 p-4">
-        {/* 月份导航 */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-            {format(currentMonth, 'yyyy年M月', { locale: zhCN })}
-          </h2>
-          <div className="flex items-center gap-1">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* 全屏日历视图 */}
+      {!showDateDetail ? (
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
+          {/* 月份导航 */}
+          <div className="px-4 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-white">
+              {format(currentMonth, 'yyyy年M月', { locale: zhCN })}
+            </h2>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* 星期标题 */}
+          <div className="grid grid-cols-7 px-2 py-2 bg-gray-50 dark:bg-gray-800">
+            {['日', '一', '二', '三', '四', '五', '六'].map((day, i) => (
+              <div key={day} className={`text-center text-xs font-medium py-1 ${i === 0 || i === 6 ? 'text-orange-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                {day}
+              </div>
+            ))}
+          </div>
+          
+          {/* 日期网格 */}
+          <div className="flex-1 grid grid-cols-7 px-2 pb-2 gap-0.5">
+            {calendarDays.map((day, index) => {
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isSelected = isSameDay(day, selectedDate);
+              const isTodayDate = isToday(day);
+              const taskCount = getTaskCountForDate(day);
+              const holidayName = getHolidayName(day);
+              const weekend = isWeekend(day);
+              const lunar = getLunarCalendar(day);
+              
+              return (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setSelectedDate(day);
+                    setShowDateDetail(true);
+                  }}
+                  className={`relative flex flex-col items-center justify-start pt-1 pb-1 rounded-lg transition-all min-h-[56px]
+                             ${!isCurrentMonth ? 'opacity-30' : ''}
+                             ${isSelected ? 'bg-blue-500 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                >
+                  <span className={`text-sm ${isTodayDate && !isSelected ? 'font-bold text-blue-500' : ''} ${weekend && !isSelected ? 'text-orange-400' : ''} ${isSelected ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}>
+                    {day.getDate()}
+                  </span>
+                  {/* 节假日标签 */}
+                  {holidayName && !isSelected && (
+                    <span className="text-[9px] text-red-500 font-medium leading-tight">{holidayName}</span>
+                  )}
+                  {/* 农历 */}
+                  {!holidayName && isCurrentMonth && !isSelected && (
+                    <span className={`text-[9px] ${weekend ? 'text-orange-300' : 'text-gray-400 dark:text-gray-500'}`}>{lunar.lunarDay}</span>
+                  )}
+                  {isSelected && holidayName && (
+                    <span className="text-[9px] text-white/80">{holidayName}</span>
+                  )}
+                  {/* 任务数量指示 */}
+                  {taskCount > 0 && !isSelected && (
+                    <div className="mt-0.5">
+                      <span className="text-[10px] text-blue-500 font-medium">{taskCount}</span>
+                    </div>
+                  )}
+                  {taskCount > 0 && isSelected && (
+                    <div className="mt-0.5">
+                      <span className="text-[10px] text-white/80 font-medium">{taskCount}项</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* 全屏日期详情页 */
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
+          {/* 顶部导航 */}
+          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
             <button
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setShowDateDetail(false)}
+              className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
+            <div className="text-center">
+              <div className="text-base font-semibold text-gray-800 dark:text-white">
+                {selectedDate.getMonth() + 1}月{selectedDate.getDate()}日
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{selectedWeekDay}</div>
+            </div>
             <button
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => setShowAddModal(true)}
+              className="w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center text-white transition-colors"
             >
-              <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
               </svg>
             </button>
           </div>
-        </div>
-        
-        {/* 星期标题 */}
-        <div className="grid grid-cols-7 mb-2">
-          {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-            <div key={day} className="text-center text-xs text-gray-500 dark:text-gray-400 py-1">
-              {day}
-            </div>
-          ))}
-        </div>
-        
-        {/* 日期网格 */}
-        <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((day, index) => {
-            const isCurrentMonth = isSameMonth(day, currentMonth);
-            const isSelected = isSameDay(day, selectedDate);
-            const isTodayDate = isToday(day);
-            const taskCount = getTaskCountForDate(day);
-            
-            return (
-              <button
-                key={index}
-                onClick={() => setSelectedDate(day)}
-                className={`relative flex flex-col items-center justify-center py-2 rounded-lg transition-all
-                           ${!isCurrentMonth ? 'opacity-30' : ''}
-                           ${isSelected ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-              >
-                <span className={`text-sm ${isTodayDate && !isSelected ? 'font-bold text-blue-500' : ''}`}>
-                  {day.getDate()}
-                </span>
-                {taskCount > 0 && !isSelected && (
-                  <div className="flex gap-0.5 mt-1">
-                    {Array.from({ length: Math.min(taskCount, 3) }).map((_, i) => (
-                      <div key={i} className="w-1 h-1 rounded-full bg-blue-500" />
-                    ))}
+          
+          {/* 任务列表 */}
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {selectedDateTasks.length > 0 ? (
+              <div className="space-y-2">
+                {selectedDateTasks.map((task) => (
+                  <div key={task.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={() => {
+                          const toggleTaskComplete = useTodoStore.getState().toggleTaskComplete;
+                          toggleTaskComplete(task.id);
+                        }}
+                        className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors
+                                  ${task.status === 'completed' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}
+                      >
+                        {task.status === 'completed' && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-white'}`}>
+                          {task.title}
+                        </div>
+                        {task.subTasks && task.subTasks.length > 0 && (
+                          <div className="mt-2 space-y-1.5">
+                            {task.subTasks.map((sub, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                <div className={`w-3.5 h-3.5 rounded border ${sub.completed ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`} />
+                                <span className={sub.completed ? 'line-through' : ''}>{sub.title}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setEditingTask(task)}
+                        className="p-1.5 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                )}
-                {taskCount > 0 && isSelected && (
-                  <div className="flex gap-0.5 mt-1">
-                    {Array.from({ length: Math.min(taskCount, 3) }).map((_, i) => (
-                      <div key={i} className="w-1 h-1 rounded-full bg-white/80" />
-                    ))}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <div className="text-5xl mb-4 opacity-40">📝</div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">暂无待办</p>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full text-sm font-medium transition-colors"
+                >
+                  添加待办
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      
-      {/* 选中日期的任务列表 */}
-      <div className="px-4 py-4">
-        <h3 className="text-base font-medium text-gray-800 dark:text-white mb-3">
-          {selectedDateStr} {selectedWeekDay}
-        </h3>
-        
-        {selectedDateTasks.length > 0 ? (
-          <div className="space-y-1">
-            {selectedDateTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onEdit={setEditingTask}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-3">📅</div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              这天没有任务
-            </p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
   
@@ -872,16 +1026,16 @@ export default function Home() {
                     backgroundColor: user?.avatar && avatarColors.includes(user.avatar as any) ? user.avatar : '#3b82f6' 
                   }}
                 >
-                  {user?.avatar && avatarEmojis.includes(user.avatar as any) 
-                    ? user.avatar 
-                    : (user?.name?.charAt(0).toUpperCase() || '登')}
+                  {user?.avatar && avatarEmojis.includes(user.avatar as any)
+                    ? user.avatar
+                    : (user?.nickname?.charAt(0).toUpperCase() || user?.nickname?.charAt(0) || 'U')}
                 </div>
                 <div className="text-left">
                   <div className="text-sm font-medium text-gray-800 dark:text-white">
-                    {user?.isLoggedIn ? user.name : '登录账号'}
+                    {user?.nickname || '用户'}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {user?.isLoggedIn ? '点击修改个人信息' : '登录以同步数据'}
+                    点击修改个人信息
                   </div>
                 </div>
               </div>
@@ -1287,284 +1441,342 @@ export default function Home() {
   const renderNormalPage = () => (
     <div className="flex-1 flex flex-col pb-24 md:pb-4">
       {/* 可滚动的日历区域 */}
-      <div className="bg-[#f3f3f3] dark:bg-gray-800 overflow-y-auto max-h-48">
-        <div className="px-4 py-3">
-          {/* 7天柱状图 */}
-          <div className="flex items-end justify-between gap-1 h-24">
-            {weekDays.map((day, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div 
-                  className={`w-full rounded-t transition-all ${day.count > 0 ? 'bg-blue-400' : 'bg-gray-300 dark:bg-gray-600'}`}
-                  style={{ height: `${Math.max(day.count / maxCount * 70, day.count > 0 ? 8 : 4)}px` }}
-                />
-                <div className={`mt-1 flex flex-col items-center ${day.isToday ? 'relative' : ''}`}>
-                  <span className={`text-xs ${day.isToday ? 'font-bold text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                    {day.day}
-                  </span>
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                    {day.weekDay}
-                  </span>
-                  {day.isToday && (
-                    <div className="absolute -bottom-0.5 w-5 h-5 bg-green-500 rounded-full" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* 月份和周导航（可展开更多日历） */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {format(currentMonth, 'yyyy年M月', { locale: zhCN })}
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={() => {
-                  const newMonth = new Date(currentMonth);
-                  newMonth.setMonth(newMonth.getMonth() - 1);
-                  setCurrentMonth(newMonth);
-                }}
-                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setCurrentMonth(new Date())}
-                className="px-2 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600"
-              >
-                今天
-              </button>
-              <button
-                onClick={() => {
-                  const newMonth = new Date(currentMonth);
-                  newMonth.setMonth(newMonth.getMonth() + 1);
-                  setCurrentMonth(newMonth);
-                }}
-                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          
-          {/* 全月日历（可折叠/展开） */}
-          <div className="mt-2">
-            {/* 星期标题 */}
-            <div className="grid grid-cols-7 mb-1">
-              {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
-                <div key={day} className="text-center text-xs text-gray-400 dark:text-gray-500 py-1">
-                  {day}
-                </div>
-              ))}
-            </div>
+      <div className="bg-gradient-to-b from-blue-400 to-blue-500 dark:from-slate-700 dark:to-slate-800 overflow-hidden">
+        <div className="px-4 pt-4 pb-2">
+          {/* 7天曲线图 */}
+          <div className="relative h-36">
+            {/* 曲线层 - 底部渐变填充 */}
+            <svg className="absolute bottom-12 left-0 right-0 h-[70px] pointer-events-none" preserveAspectRatio="none">
+              {weekDays.length > 1 && (
+                <>
+                  {/* 填充区域 */}
+                  <path
+                    d={weekDays.map((day, i) => {
+                      const x = (i / 6) * 100;
+                      const height = (day.completedCount / maxCount) * 60;
+                      const y = 70 - height;
+                      return i === 0 ? `M ${x}% ${y}%` : `L ${x}% ${y}%`;
+                    }).join(' ') + ` L 100% 70% L 0% 70% Z`}
+                    fill="rgba(255,255,255,0.2)"
+                  />
+                  {/* 曲线线条 */}
+                  <path
+                    d={weekDays.map((day, i) => {
+                      const x = (i / 6) * 100;
+                      const height = (day.completedCount / maxCount) * 60;
+                      const y = 70 - height;
+                      return i === 0 ? `M ${x}% ${y}%` : `L ${x}% ${y}%`;
+                    }).join(' ')}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </>
+              )}
+            </svg>
             
-            {/* 日期网格 */}
-            <div className="grid grid-cols-7 gap-0.5">
-              {calendarDays.map((day, index) => {
-                const isCurrentMonth = isSameMonth(day, currentMonth);
-                const isTodayDate = isToday(day);
-                const taskCount = getTaskCountForDate(day);
-                
+            {/* 小圆点层 - 根据完成数量浮动 */}
+            <div className="absolute bottom-12 left-0 right-0 flex justify-between px-3">
+              {weekDays.map((day, index) => {
+                const height = (day.completedCount / maxCount) * 60;
                 return (
                   <div
                     key={index}
-                    className={`relative flex flex-col items-center justify-center py-1 text-xs
-                               ${!isCurrentMonth ? 'opacity-30' : ''}`}
+                    className="flex flex-col items-center w-10"
+                    style={{ 
+                      transform: `translateY(-${height}px)`,
+                      transition: 'transform 0.3s ease'
+                    }}
                   >
-                    <span className={`${isTodayDate ? 'w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center font-medium' : ''}`}>
-                      {day.getDate()}
-                    </span>
-                    {taskCount > 0 && (
-                      <div className="flex gap-px mt-0.5">
-                        {Array.from({ length: Math.min(taskCount, 3) }).map((_, i) => (
-                          <div key={i} className="w-1 h-1 rounded-full bg-blue-400" />
-                        ))}
+                    {day.completedCount > 0 && (
+                      <div className="w-4 h-4 rounded-full bg-yellow-400 shadow-lg flex items-center justify-center border-2 border-white">
+                        <span className="text-[7px] text-blue-700 font-bold">{day.completedCount}</span>
                       </div>
+                    )}
+                    {day.completedCount === 0 && (
+                      <div className="w-3 h-3 rounded-full bg-white/50" />
                     )}
                   </div>
                 );
               })}
             </div>
+            
+            {/* 日期和星期行 - 固定在底部 */}
+            <div className="absolute bottom-0 left-0 right-0 flex justify-between px-3">
+              {weekDays.map((day, index) => (
+                <div key={index} className="flex flex-col items-center w-10">
+                  <span className="text-[11px] text-white font-medium mb-2">
+                    {['周一', '周二', '周三', '周四', '周五', '周六', '周日'][index]}
+                  </span>
+                  <button
+                    onClick={() => setSelectedDate(day.date)}
+                    className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-medium transition-all
+                              ${isSameDay(day.date, selectedDate)
+                                ? 'bg-blue-500 text-white ring-2 ring-white ring-offset-1 ring-offset-blue-400' 
+                                : day.isToday
+                                  ? 'bg-white/50 text-white'
+                                  : 'text-white hover:bg-white/30'}`}
+                  >
+                    {day.day}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
       
-      {/* 任务列表 */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredTasks.length > 0 ? (
-          <div className="space-y-1 px-4 py-4">
-            {filteredTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onEdit={setEditingTask}
-              />
-            ))}
+      {/* 任务区域 - 白色背景 */}
+      <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
+        {/* 选中日期显示 */}
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {format(selectedDate, 'M月d日', { locale: zhCN })} {selectedWeekDay}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {selectedDateTasks.length} 个任务
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-16 px-4">
-            <div className="text-5xl mb-4">📝</div>
-            <h3 className="text-base font-medium text-gray-500 dark:text-gray-400 mb-1">
-              {searchQuery ? '没有找到匹配的任务' : currentListId === 'completed' 
-                ? '还没有已完成的任务' 
-                : '开始添加任务吧'}
-            </h3>
-            <p className="text-sm text-gray-400 dark:text-gray-500">
-              {searchQuery ? '尝试其他关键词' : currentListId === 'completed' 
-                ? '完成任务后会显示在这里' 
-                : '点击右下角 + 按钮添加任务'}
-            </p>
-          </div>
-        )}
+        </div>
+        
+        {/* 任务列表 */}
+        <div className="px-4 py-4">
+          {/* 任务列表 */}
+          {filteredTasks.length > 0 ? (
+            <div className="space-y-1">
+              {filteredTasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onEdit={setEditingTask}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 px-4">
+              <div className="text-5xl mb-4">📝</div>
+              <h3 className="text-base font-medium text-gray-500 dark:text-gray-400 mb-1">
+                {searchQuery ? '没有找到匹配的任务' : currentListId === 'completed' 
+                  ? '还没有已完成的任务' 
+                  : '开始添加任务吧'}
+              </h3>
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                {searchQuery ? '尝试其他关键词' : currentListId === 'completed' 
+                  ? '完成任务后会显示在这里' 
+                  : '点击右下角 + 按钮添加任务'}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
   
   return (
     <ThemeProvider>
-    <div className="flex h-screen bg-white dark:bg-gray-900">
-      {/* 侧边栏 */}
-      <div className="hidden md:block">
-        <Sidebar currentListId={currentListId} onSelectList={setCurrentListId} />
-      </div>
-      
-      {/* 主内容区 */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 relative">
-        {/* 顶部灰色背景区域 */}
-        <div className="bg-[#f3f3f3] dark:bg-gray-800">
-          {/* 标题栏 */}
-          <div className="px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{currentList?.icon || '📋'}</span>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-800 dark:text-white">{currentList?.name || '清单'}</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {isPomodoroPage 
-                    ? sessions > 0 ? `${sessions} 个番茄完成` : '开始你的专注'
-                    : isCalendarPage ? `${getTasksForDate(selectedDate).length} 个任务` : `${currentTasks.length} 个任务`}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-              <button className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                </svg>
-              </button>
-            </div>
+      {!user ? (
+        <AuthPage />
+      ) : (
+        <div className="flex h-screen bg-white dark:bg-gray-900">
+          {/* 侧边栏 */}
+          <div className="hidden md:block">
+            <Sidebar currentListId={currentListId} onSelectList={setCurrentListId} />
           </div>
-          
-          {/* 搜索框 */}
-          {showSearch && !isCalendarPage && !isPomodoroPage && (
-            <div className="px-4 pb-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索任务..."
-                className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 
-                           rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
+
+          {/* 主内容区 */}
+          <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 relative">
+            {/* 顶部灰色背景区域 */}
+            <div className="bg-[#f3f3f3] dark:bg-gray-800">
+              {/* 标题栏 */}
+              <div className="px-4 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{currentList?.icon || '📋'}</span>
+                  <div>
+                    <h1 className="text-xl font-semibold text-gray-800 dark:text-white">{currentList?.name || '清单'}</h1>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {isPomodoroPage
+                        ? sessions > 0 ? `${sessions} 个番茄完成` : '开始你的专注'
+                        : isCalendarPage ? `${getTasksForDate(selectedDate).length} 个任务` : `${currentTasks.length} 个任务`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setShowSearch(!showSearch)}
+                    className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                  <button className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* 搜索框 */}
+              {showSearch && !isCalendarPage && !isPomodoroPage && (
+                <div className="px-4 pb-4">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="搜索任务..."
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600
+                               rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+              )}
             </div>
+
+            {/* 移动端底部导航 */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-40">
+              <div className="flex justify-around py-2">
+                <button
+                  onClick={() => setCurrentListId('calendar')}
+                  className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
+                             ${currentListId === 'calendar' ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  <span className="text-lg">📅</span>
+                  <span className="text-[10px] mt-0.5">日历</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentListId('all')}
+                  className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
+                             ${currentListId === 'all' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  <span className="text-lg">📋</span>
+                  <span className="text-[10px] mt-0.5">清单</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentListId('pomodoro')}
+                  className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
+                             ${currentListId === 'pomodoro' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  <span className="text-lg">🍅</span>
+                  <span className="text-[10px] mt-0.5">番茄</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentListId('notes')}
+                  className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
+                             ${currentListId === 'notes' ? 'text-purple-500' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  <span className="text-lg">📝</span>
+                  <span className="text-[10px] mt-0.5">记事</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentListId('settings')}
+                  className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
+                             ${currentListId === 'settings' ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  <span className="text-lg">⚙️</span>
+                  <span className="text-[10px] mt-0.5">设置</span>
+                </button>
+              </div>
+            </nav>
+
+            {/* 内容区域 */}
+            {isPomodoroPage ? renderPomodoroPage() :
+             isCalendarPage ? renderCalendarPage() :
+             isNotesPage ? <NotesPage /> :
+             isSettingsPage ? <div id="settings-page" className="overflow-y-auto"><RenderSettingsPage /></div> :
+             renderNormalPage()}
+
+            {/* 右下角添加按钮 - 清单页面（记事本页面不显示） */}
+            {!isPomodoroPage && !isCalendarPage && !isSettingsPage && !isNotesPage && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="fixed bottom-24 md:bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 rounded-full shadow-lg
+                           flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-30"
+              >
+                <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
+
+            {/* 右下角新建笔记按钮 - 仅记事本页面 */}
+            {isNotesPage && (
+              <div className="fixed bottom-24 md:bottom-6 right-6 flex items-center gap-2 z-30">
+                <div className={`flex items-center gap-2 transition-all duration-300 ease-out ${showNoteTypeMenu ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8 pointer-events-none'}`}>
+                  <button
+                    onClick={() => {
+                      const noteId = useTodoStore.getState().addNote('', '', 'normal');
+                      setShowNoteTypeMenu(false);
+                      setCurrentListId('notes');
+                      setTimeout(() => {
+                        const event = new CustomEvent('selectNote', { detail: noteId });
+                        window.dispatchEvent(event);
+                      }, 100);
+                    }}
+                    className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-xl shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  >
+                    <span className="text-xl">📄</span>
+                    <span className="font-medium text-sm whitespace-nowrap">普通笔记</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const noteId = useTodoStore.getState().addNote('', '', 'markdown');
+                      setShowNoteTypeMenu(false);
+                      setCurrentListId('notes');
+                      setTimeout(() => {
+                        const event = new CustomEvent('selectNote', { detail: noteId });
+                        window.dispatchEvent(event);
+                      }, 100);
+                    }}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-xl shadow-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
+                  >
+                    <span className="text-xl">📝</span>
+                    <span className="font-medium text-sm whitespace-nowrap">Markdown</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowNoteTypeMenu(!showNoteTypeMenu)}
+                  className={`w-14 h-14 bg-purple-500 hover:bg-purple-600 rounded-full shadow-lg flex items-center justify-center transition-all z-30 ${showNoteTypeMenu ? 'rotate-45' : ''}`}
+                >
+                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* 添加任务弹窗 */}
+            {showAddModal && (
+              <AddTaskModal onClose={() => setShowAddModal(false)} />
+            )}
+          </main>
+
+          {/* 编辑任务弹窗 */}
+          {editingTask && (
+            <TaskEditModal
+              task={editingTask}
+              isOpen={!!editingTask}
+              onClose={() => setEditingTask(null)}
+            />
+          )}
+
+          {/* 未完成任务转移弹窗 */}
+          {pendingTransferTasks.length > 0 && (
+            <TransferTasksModal
+              tasks={pendingTransferTasks}
+              onConfirm={confirmTransferTasks}
+              onDismiss={dismissTransferTasks}
+            />
           )}
         </div>
-        
-        {/* 移动端底部导航 */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-40">
-          <div className="flex justify-around py-2">
-            <button
-              onClick={() => setCurrentListId('calendar')}
-              className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
-                         ${currentListId === 'calendar' ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <span className="text-lg">📅</span>
-              <span className="text-[10px] mt-0.5">日历</span>
-            </button>
-            
-            <button
-              onClick={() => setCurrentListId('all')}
-              className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
-                         ${currentListId === 'all' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <span className="text-lg">📋</span>
-              <span className="text-[10px] mt-0.5">清单</span>
-            </button>
-            
-            <button
-              onClick={() => setCurrentListId('pomodoro')}
-              className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
-                         ${currentListId === 'pomodoro' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <span className="text-lg">🍅</span>
-              <span className="text-[10px] mt-0.5">番茄</span>
-            </button>
-            
-            <button
-              onClick={() => setCurrentListId('settings')}
-              className={`flex flex-col items-center py-1 px-2 transition-colors touch-optimize
-                         ${currentListId === 'settings' ? 'text-blue-500' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <span className="text-lg">⚙️</span>
-              <span className="text-[10px] mt-0.5">设置</span>
-            </button>
-          </div>
-        </nav>
-        
-        {/* 内容区域 */}
-        {isPomodoroPage ? renderPomodoroPage() :
-         isCalendarPage ? renderCalendarPage() :
-         isSettingsPage ? <div id="settings-page" className="overflow-y-auto"><RenderSettingsPage /></div> :
-         renderNormalPage()}
-        
-        {/* 右下角添加按钮 - 只在清单列表页面显示 */}
-        {!isPomodoroPage && !isCalendarPage && !isSettingsPage && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="fixed bottom-24 md:bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 rounded-full shadow-lg 
-                       flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-30"
-          >
-            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        )}
-        
-        {/* 添加任务弹窗 */}
-        {showAddModal && (
-          <AddTaskModal onClose={() => setShowAddModal(false)} />
-        )}
-      </main>
-      
-      {/* 编辑任务弹窗 */}
-      {editingTask && (
-        <TaskEditModal
-          task={editingTask}
-          isOpen={!!editingTask}
-          onClose={() => setEditingTask(null)}
-        />
       )}
-      
-      {/* 未完成任务转移弹窗 */}
-      {pendingTransferTasks.length > 0 && (
-        <TransferTasksModal
-          tasks={pendingTransferTasks}
-          onConfirm={confirmTransferTasks}
-          onDismiss={dismissTransferTasks}
-        />
-      )}
-    </div>
     </ThemeProvider>
   );
 }

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, TaskList, AppSettings, defaultLists, Priority, SubTask, TaskStatus, Workload, User } from '@/types/todo';
+import { Task, TaskList, AppSettings, defaultLists, Priority, SubTask, TaskStatus, Workload, User, Note, NoteFolder, NoteType } from '@/types/todo';
 import { startOfDay, isSameDay, addDays, parseISO, format } from 'date-fns';
 
 // 用户默认设置
 const defaultUser: User | null = null;
+const defaultToken: string | null = null;
 
 interface TodoStore {
   // 状态
@@ -13,11 +14,18 @@ interface TodoStore {
   lists: TaskList[];
   settings: AppSettings;
   user: User | null;
+  token: string | null;
   lastCheckedDate: string; // 上次检查日期，用于每日检查
   pendingTransferTasks: Task[]; // 待转移的未完成任务（用于弹窗显示）
-  
+
+  // 记事本状态
+  notes: Note[];
+  noteFolders: NoteFolder[];
+
   // 用户设置
-  setUser: (user: User | null) => void;
+  setAuth: (user: User, token: string) => void;
+  logout: () => void;
+  updateUserProfile: (updates: Partial<User>) => void;
   
   // 设置
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -33,7 +41,7 @@ interface TodoStore {
   deleteList: (id: string) => void;
   
   // 任务操作
-  addTask: (title: string, listId?: string, priority?: Priority, workload?: Workload, dueDate?: string, dueTime?: string, isRecurring?: boolean) => string;
+  addTask: (title: string, listId?: string, priority?: Priority, workload?: Workload, dueDate?: string, dueTime?: string, isRecurring?: boolean, description?: string, subTasks?: { id: string; title: string; completed: boolean }[]) => string;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTaskComplete: (id: string) => void;
@@ -63,6 +71,21 @@ interface TodoStore {
   exportData: () => string;
   importData: (jsonStr: string) => boolean;
   clearCompletedTasks: () => void;
+
+  // 记事本操作
+  addNote: (title: string, content?: string, type?: NoteType, folderId?: string) => string;
+  updateNote: (id: string, updates: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
+  toggleNotePin: (id: string) => void;
+  toggleNoteFavorite: (id: string) => void;
+  moveNoteToFolder: (noteId: string, folderId: string | undefined) => void;
+  searchNotes: (query: string) => Note[];
+  convertNoteType: (id: string, newType: NoteType) => void;
+
+  // 文件夹操作
+  addNoteFolder: (name: string) => string;
+  updateNoteFolder: (id: string, updates: Partial<NoteFolder>) => void;
+  deleteNoteFolder: (id: string) => void;
 }
 
 export const useTodoStore = create<TodoStore>()(
@@ -83,9 +106,18 @@ export const useTodoStore = create<TodoStore>()(
       user: defaultUser,
       lastCheckedDate: '',
       pendingTransferTasks: [],
+      notes: [],
+      noteFolders: [],
+      token: defaultToken,
 
-      // 用户设置
-      setUser: (user) => set({ user }),
+      // 用户认证
+      setAuth: (user, token) => set({ user, token }),
+
+      logout: () => set({ user: null, token: null }),
+
+      updateUserProfile: (updates) => set((state) => ({
+        user: state.user ? { ...state.user, ...updates } : null
+      })),
 
       // 设置操作
       setTheme: (theme) => set((state) => ({
@@ -140,7 +172,7 @@ export const useTodoStore = create<TodoStore>()(
       })),
       
       // 任务操作
-      addTask: (title, listId, priority = 'medium', workload, dueDate, dueTime, isRecurring = false) => {
+      addTask: (title, listId, priority = 'medium', workload, dueDate, dueTime, isRecurring = false, description, subTasks) => {
         const id = uuidv4();
         const now = new Date().toISOString();
         const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -153,13 +185,14 @@ export const useTodoStore = create<TodoStore>()(
           createdDate: todayStr,
           updatedAt: now,
           listId: listId || get().settings.defaultListId,
-          subTasks: [],
+          subTasks: subTasks || [],
           tags: [],
           isArchived: false,
           workload,
           dueDate,
           dueTime,
           isRecurring,
+          description,
         };
         set((state) => ({ tasks: [...state.tasks, newTask] }));
         return id;
@@ -177,18 +210,34 @@ export const useTodoStore = create<TodoStore>()(
         tasks: state.tasks.filter((task) => task.id !== id),
       })),
       
-      toggleTaskComplete: (id) => set((state) => ({
-        tasks: state.tasks.map((task) => {
-          if (task.id !== id) return task;
-          const isCompleting = task.status === 'active';
-          return {
+      toggleTaskComplete: (id) => set((state) => {
+        const task = state.tasks.find(t => t.id === id);
+        if (!task) return state;
+
+        const isCompleting = task.status === 'active';
+
+        if (isCompleting) {
+          // 完成任务：将任务移到已完成列表末尾
+          const activeTasks = state.tasks.filter(t => t.id !== id && t.status === 'active');
+          const completedTasks = [...state.tasks.filter(t => t.id !== id && t.status === 'completed'), {
             ...task,
-            status: isCompleting ? 'completed' : 'active',
-            completedAt: isCompleting ? new Date().toISOString() : undefined,
+            status: 'completed' as const,
+            completedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-          };
-        }),
-      })),
+          }];
+          return { tasks: [...activeTasks, ...completedTasks] };
+        } else {
+          // 取消完成：将任务移到未完成列表末尾
+          const completedTasks = state.tasks.filter(t => t.id !== id && t.status === 'completed');
+          const activeTasks = [...state.tasks.filter(t => t.id !== id && t.status === 'active'), {
+            ...task,
+            status: 'active' as const,
+            completedAt: undefined,
+            updatedAt: new Date().toISOString(),
+          }];
+          return { tasks: [...activeTasks, ...completedTasks] };
+        }
+      }),
       
       archiveTask: (id) => set((state) => ({
         tasks: state.tasks.map((task) =>
@@ -407,8 +456,10 @@ export const useTodoStore = create<TodoStore>()(
           tasks: state.tasks,
           lists: state.lists,
           settings: state.settings,
+          notes: state.notes,
+          noteFolders: state.noteFolders,
           exportedAt: new Date().toISOString(),
-          version: '1.1.0',
+          version: '1.2.0',
         };
         return JSON.stringify(data, null, 2);
       },
@@ -434,6 +485,12 @@ export const useTodoStore = create<TodoStore>()(
               settings: { ...state.settings, ...data.settings }
             }));
           }
+          if (data.notes && Array.isArray(data.notes)) {
+            set({ notes: data.notes });
+          }
+          if (data.noteFolders && Array.isArray(data.noteFolders)) {
+            set({ noteFolders: data.noteFolders });
+          }
           return true;
         } catch (e) {
           console.error('Import failed:', e);
@@ -447,6 +504,102 @@ export const useTodoStore = create<TodoStore>()(
           tasks: state.tasks.filter((task) => task.status !== 'completed')
         }));
       },
+
+      // 记事本操作
+      addNote: (title, content = '', type = 'normal', folderId) => {
+        const id = uuidv4();
+        const now = new Date().toISOString();
+        const newNote: Note = {
+          id,
+          title,
+          content,
+          type,
+          createdAt: now,
+          updatedAt: now,
+          folderId,
+          tags: [],
+          isPinned: false,
+          isFavorite: false,
+          wordCount: content.trim().split(/\s+/).filter(Boolean).length,
+        };
+        set((state) => ({ notes: [...state.notes, newNote] }));
+        return id;
+      },
+
+      updateNote: (id, updates) => set((state) => ({
+        notes: state.notes.map((note) => {
+          if (note.id !== id) return note;
+          const updated = { ...note, ...updates, updatedAt: new Date().toISOString() };
+          if (updates.content !== undefined) {
+            updated.wordCount = updates.content.trim().split(/\s+/).filter(Boolean).length;
+          }
+          return updated;
+        }),
+      })),
+
+      deleteNote: (id) => set((state) => ({
+        notes: state.notes.filter((note) => note.id !== id),
+      })),
+
+      toggleNotePin: (id) => set((state) => ({
+        notes: state.notes.map((note) =>
+          note.id === id ? { ...note, isPinned: !note.isPinned, updatedAt: new Date().toISOString() } : note
+        ),
+      })),
+
+      toggleNoteFavorite: (id) => set((state) => ({
+        notes: state.notes.map((note) =>
+          note.id === id ? { ...note, isFavorite: !note.isFavorite, updatedAt: new Date().toISOString() } : note
+        ),
+      })),
+
+      moveNoteToFolder: (noteId, folderId) => set((state) => ({
+        notes: state.notes.map((note) =>
+          note.id === noteId ? { ...note, folderId, updatedAt: new Date().toISOString() } : note
+        ),
+      })),
+
+      searchNotes: (query) => {
+        const { notes } = get();
+        const lowerQuery = query.toLowerCase();
+        return notes.filter((note) =>
+          note.title.toLowerCase().includes(lowerQuery) ||
+          note.content.toLowerCase().includes(lowerQuery) ||
+          note.tags.some((tag) => tag.toLowerCase().includes(lowerQuery))
+        );
+      },
+
+      convertNoteType: (id, newType) => set((state) => ({
+        notes: state.notes.map((note) =>
+          note.id === id ? { ...note, type: newType, updatedAt: new Date().toISOString() } : note
+        ),
+      })),
+
+      // 文件夹操作
+      addNoteFolder: (name) => {
+        const id = uuidv4();
+        const newFolder: NoteFolder = {
+          id,
+          name,
+          createdAt: new Date().toISOString(),
+          order: get().noteFolders.length,
+        };
+        set((state) => ({ noteFolders: [...state.noteFolders, newFolder] }));
+        return id;
+      },
+
+      updateNoteFolder: (id, updates) => set((state) => ({
+        noteFolders: state.noteFolders.map((folder) =>
+          folder.id === id ? { ...folder, ...updates } : folder
+        ),
+      })),
+
+      deleteNoteFolder: (id) => set((state) => ({
+        noteFolders: state.noteFolders.filter((folder) => folder.id !== id),
+        notes: state.notes.map((note) =>
+          note.folderId === id ? { ...note, folderId: undefined } : note
+        ),
+      })),
     }),
     {
       name: 'todo-storage',

@@ -11,11 +11,13 @@ interface AddTaskModalProps {
 
 export function AddTaskModal({ onClose }: AddTaskModalProps) {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [workload, setWorkload] = useState<Workload>('medium');
   const [dueDate, setDueDate] = useState('');
   const [dueTime, setDueTime] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [subTasks, setSubTasks] = useState<{ id: string; title: string; completed: boolean }[]>([]);
   
   const addTask = useTodoStore((state) => state.addTask);
   
@@ -29,10 +31,28 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       workload, 
       dueDate || format(new Date(), 'yyyy-MM-dd'), 
       dueTime || undefined,
-      isRecurring
+      isRecurring,
+      description || undefined,
+      subTasks.length > 0 ? subTasks : undefined
     );
     
     onClose();
+  };
+
+  // 添加子任务
+  const addSubTask = () => {
+    const newId = `sub-${Date.now()}`;
+    setSubTasks([...subTasks, { id: newId, title: '', completed: false }]);
+  };
+
+  // 更新子任务标题
+  const updateSubTaskTitle = (id: string, newTitle: string) => {
+    setSubTasks(subTasks.map(st => st.id === id ? { ...st, title: newTitle } : st));
+  };
+
+  // 删除子任务
+  const removeSubTask = (id: string) => {
+    setSubTasks(subTasks.filter(st => st.id !== id));
   };
   
   const quickDates = [
@@ -76,6 +96,80 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 
                        rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
           />
+          
+          {/* 描述框 */}
+          <div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="添加描述..."
+              rows={2}
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 
+                         rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700 dark:text-gray-300 
+                         resize-none placeholder-gray-400 dark:placeholder-gray-500"
+            />
+          </div>
+          
+          {/* 子任务 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">子任务</label>
+              {subTasks.length > 0 && (
+                <span className="text-xs text-blue-500">{subTasks.filter(st => st.title.trim()).length}/{subTasks.length}</span>
+              )}
+            </div>
+            <div className="space-y-2">
+              {subTasks.map((subTask, index) => (
+                <div key={subTask.id} className="flex items-center gap-2 group">
+                  <div className="w-4 h-4 rounded border border-gray-300 dark:border-gray-600 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={subTask.title}
+                    onChange={(e) => updateSubTaskTitle(subTask.id, e.target.value)}
+                    placeholder="子任务..."
+                    className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 
+                               rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && subTask.title.trim()) {
+                        e.preventDefault();
+                        addSubTask();
+                      }
+                    }}
+                  />
+                  {index === subTasks.length - 1 && subTask.title.trim() && (
+                    <button
+                      onClick={addSubTask}
+                      className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => removeSubTask(subTask.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {subTasks.length === 0 && (
+                <button
+                  onClick={addSubTask}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 
+                             hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span>添加子任务</span>
+                </button>
+              )}
+            </div>
+          </div>
           
           {/* 截止日期快捷选项 */}
           <div>

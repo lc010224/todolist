@@ -1,12 +1,37 @@
+// 记事本
+export type NoteType = 'normal' | 'markdown';
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  type: NoteType;
+  createdAt: string;
+  updatedAt: string;
+  folderId?: string;
+  tags: string[];
+  isPinned: boolean;
+  isFavorite: boolean;
+  wordCount: number;
+}
+
+export interface NoteFolder {
+  id: string;
+  name: string;
+  createdAt: string;
+  order: number;
+}
+
 export type Priority = 'high' | 'medium' | 'low';
 export type TaskStatus = 'active' | 'completed';
 export type Workload = 'quick' | 'medium' | 'long'; // 快速、中等、耗时
 
 export interface User {
-  name: string;
-  avatar: string; // 颜色代码、emoji 或 base64 图片
-  isLoggedIn: boolean;
-  loginType?: 'local' | 'wechat'; // 登录方式
+  id: string;
+  email: string;
+  nickname: string;
+  avatar?: string; // 颜色代码、emoji 或 base64 图片
+  createdAt?: string;
 }
 
 export interface SubTask {
@@ -102,12 +127,21 @@ export const defaultLists: TaskList[] = [
     isDefault: true,
   },
   {
+    id: 'notes',
+    name: '记事本',
+    icon: '📝',
+    color: '#8b5cf6',
+    createdAt: new Date().toISOString(),
+    order: 3,
+    isDefault: true,
+  },
+  {
     id: 'settings',
     name: '设置',
     icon: '⚙️',
     color: '#64748b',
     createdAt: new Date().toISOString(),
-    order: 3,
+    order: 4,
     isDefault: true,
   },
 ];

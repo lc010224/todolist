@@ -77,7 +77,7 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
       );
     }
     
-    if (avatarEmojis.includes(user.avatar)) {
+    if (avatarEmojis.includes(user.avatar || '')) {
       return (
         <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg">
           {user.avatar}
@@ -88,9 +88,9 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
     return (
       <div 
         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-        style={{ backgroundColor: user.avatar }}
+        style={{ backgroundColor: user.avatar || '#3b82f6' }}
       >
-        {user.name.charAt(0).toUpperCase()}
+        {(user.nickname || 'U').charAt(0).toUpperCase()}
       </div>
     );
   };

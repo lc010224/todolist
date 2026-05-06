@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "id": "c5f81146-7822-4938-94ec-279dece3bcfd",
+      "email": "3975968052@qq.com",
+      "nickname": "liumang",
+      "passwordHash": "d033e5acc1c1385f409a9a6f5f4076a8ba1d66a0684f28da0ebc58f39be8579b",
+      "createdAt": "2026-05-06T06:24:38.134Z"
+    }
+  ],
+  "verifyCodes": [],
+  "pendingUsers": []
+}
