@@ -95,31 +95,31 @@ export function NoteEditor({ noteId, onClose }: NoteEditorProps) {
   };
   
   const handleExport = (format: 'txt' | 'md' | 'json') => {
-    let content: string;
     let filename: string;
     let mimeType: string;
+    let exportContent: string;
     
     const safeTitle = title.replace(/[/\\?%*:|"<>]/g, '-');
     
     switch (format) {
       case 'txt':
-        content = `${title}\n\n${content}`;
+        exportContent = `${title}\n\n${content}`;
         filename = `${safeTitle}.txt`;
         mimeType = 'text/plain';
         break;
       case 'md':
-        content = `# ${title}\n\n${content}`;
+        exportContent = `# ${title}\n\n${content}`;
         filename = `${safeTitle}.md`;
         mimeType = 'text/markdown';
         break;
       case 'json':
-        content = JSON.stringify({ title, content, type, createdAt: note?.createdAt, updatedAt: note?.updatedAt }, null, 2);
+        exportContent = JSON.stringify({ title, content, type, createdAt: note?.createdAt, updatedAt: note?.updatedAt }, null, 2);
         filename = `${safeTitle}.json`;
         mimeType = 'application/json';
         break;
     }
     
-    const blob = new Blob([content], { type: mimeType });
+    const blob = new Blob([exportContent], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

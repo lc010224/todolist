@@ -225,11 +225,14 @@ export default function Home() {
     }
   };
 
-  const [customTime, setCustomTime] = useState(30); // 自定义时间（分钟）
+  const [customTime, setCustomTime] = useState<string | number>(''); // 自定义时间（分钟）
   const [showCustomModal, setShowCustomModal] = useState(false);
 
   const getTotalTime = (m: TimerMode) => {
-    if (m === 'custom') return customTime * 60;
+    if (m === 'custom') {
+      const val = typeof customTime === 'string' ? parseInt(customTime, 10) : customTime;
+      return isNaN(val) || val < 1 ? 0 : val * 60;
+    }
     switch (m) {
       case 'work': return settings.pomodoroWorkDuration * 60;
       case 'shortBreak': return settings.pomodoroShortBreak * 60;
@@ -238,10 +241,15 @@ export default function Home() {
     }
   };
 
-  const switchMode = useCallback((newMode: TimerMode, customMinutes?: number) => {
+  const switchMode = useCallback((newMode: TimerMode, customMinutes?: number | string) => {
     setMode(newMode);
-    if (newMode === 'custom' && customMinutes) {
-      setTimeLeft(customMinutes * 60);
+    if (newMode === 'custom' && customMinutes !== undefined) {
+      const val = typeof customMinutes === 'string' ? parseInt(customMinutes, 10) : customMinutes;
+      if (!isNaN(val) && val > 0) {
+        setTimeLeft(val * 60);
+      } else {
+        return; // 无效值不切换模式
+      }
     } else {
       switch (newMode) {
         case 'work': setTimeLeft(settings.pomodoroWorkDuration * 60); break;
@@ -755,26 +763,40 @@ export default function Home() {
       
       {/* 自定义时间弹窗 */}
       {showCustomModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCustomModal(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => { setShowCustomModal(false); setCustomTime(''); }}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-72 shadow-xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-center">设置自定义时间</h3>
             <div className="flex items-center justify-center gap-3 mb-4">
               <button
-                onClick={() => setCustomTime(prev => Math.max(1, prev - 5))}
+                onClick={() => {
+                  const current = typeof customTime === 'string' ? (customTime === '' ? 0 : parseInt(customTime, 10)) : customTime;
+                  setCustomTime(Math.max(1, current - 5));
+                }}
                 className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl"
               >
                 -
               </button>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
                 value={customTime}
-                onChange={(e) => setCustomTime(Math.max(1, Math.min(180, parseInt(e.target.value) || 1)))}
-                className="w-20 h-12 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white"
-                min="1"
-                max="180"
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val === '') setCustomTime('');
+                  else {
+                    const num = parseInt(val, 10);
+                    if (num >= 1 && num <= 180) setCustomTime(num);
+                    else if (num > 180) setCustomTime(180);
+                  }
+                }}
+                className="w-20 h-12 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white placeholder-gray-400"
               />
               <button
-                onClick={() => setCustomTime(prev => Math.min(180, prev + 5))}
+                onClick={() => {
+                  const current = typeof customTime === 'string' ? (customTime === '' ? 0 : parseInt(customTime, 10)) : customTime;
+                  setCustomTime(Math.min(180, current + 5));
+                }}
                 className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl"
               >
                 +
@@ -783,15 +805,19 @@ export default function Home() {
             <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-4">分钟</p>
             <div className="flex gap-2">
               <button
-                onClick={() => setShowCustomModal(false)}
+                onClick={() => { setShowCustomModal(false); setCustomTime(''); }}
                 className="flex-1 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm"
               >
                 取消
               </button>
               <button
                 onClick={() => {
-                  switchMode('custom', customTime);
-                  setShowCustomModal(false);
+                  const val = typeof customTime === 'string' ? parseInt(customTime, 10) : customTime;
+                  if (!isNaN(val) && val > 0) {
+                    switchMode('custom', val);
+                    setShowCustomModal(false);
+                    setCustomTime('');
+                  }
                 }}
                 className="flex-1 py-2 rounded-lg bg-purple-500 text-white text-sm hover:bg-purple-600"
               >
@@ -977,38 +1003,26 @@ export default function Home() {
 
     // 调整时间
     const [showDurationPicker, setShowDurationPicker] = useState<'work' | 'shortBreak' | 'longBreak' | null>(null);
-    const [tempDuration, setTempDuration] = useState(25);
-    const [savedScrollPos, setSavedScrollPos] = useState<number | null>(null);
+    const [tempDuration, setTempDuration] = useState<string | number>('');
 
-    const openDurationPicker = (type: 'work' | 'shortBreak' | 'longBreak', currentValue: number) => {
-      // 保存当前滚动位置
-      const el = document.getElementById('settings-page');
-      if (el) setSavedScrollPos(el.scrollTop);
-      setTempDuration(currentValue);
+    const openDurationPicker = (type: 'work' | 'shortBreak' | 'longBreak') => {
+      setTempDuration('');
       setShowDurationPicker(type);
     };
 
     const saveDuration = (type: 'work' | 'shortBreak' | 'longBreak') => {
+      const val = typeof tempDuration === 'string' ? parseInt(tempDuration, 10) : tempDuration;
+      if (isNaN(val) || val < 1) return;
+      const minutes = Math.min(120, Math.max(1, val));
       if (type === 'work') {
-        setPomodoroSettings({ pomodoroWorkDuration: tempDuration });
+        setPomodoroSettings({ pomodoroWorkDuration: minutes });
       } else if (type === 'shortBreak') {
-        setPomodoroSettings({ pomodoroShortBreak: tempDuration });
+        setPomodoroSettings({ pomodoroShortBreak: minutes });
       } else {
-        setPomodoroSettings({ pomodoroLongBreak: tempDuration });
+        setPomodoroSettings({ pomodoroLongBreak: minutes });
       }
       setShowDurationPicker(null);
     };
-
-    // 恢复滚动位置
-    useEffect(() => {
-      if (savedScrollPos !== null) {
-        const el = document.getElementById('settings-page');
-        if (el) {
-          el.scrollTop = savedScrollPos;
-          setSavedScrollPos(null);
-        }
-      }
-    }, [savedScrollPos]);
 
     return (
       <div className="flex-1 overflow-y-auto pb-24 md:pb-4 bg-gray-50 dark:bg-gray-900">
@@ -1135,7 +1149,7 @@ export default function Home() {
             </div>
             <div className="p-2 space-y-1">
               <button
-                onClick={() => openDurationPicker('work', settings.pomodoroWorkDuration)}
+                onClick={() => openDurationPicker('work')}
                 className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -1150,7 +1164,7 @@ export default function Home() {
                 <span className="text-sm text-blue-500 font-medium">{settings.pomodoroWorkDuration} 分钟</span>
               </button>
               <button
-                onClick={() => openDurationPicker('shortBreak', settings.pomodoroShortBreak)}
+                onClick={() => openDurationPicker('shortBreak')}
                 className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -1165,7 +1179,7 @@ export default function Home() {
                 <span className="text-sm text-blue-500 font-medium">{settings.pomodoroShortBreak} 分钟</span>
               </button>
               <button
-                onClick={() => openDurationPicker('longBreak', settings.pomodoroLongBreak)}
+                onClick={() => openDurationPicker('longBreak')}
                 className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -1376,7 +1390,10 @@ export default function Home() {
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-center">设置时长</h3>
               <div className="flex items-center justify-center gap-4 mb-4">
                 <button
-                  onClick={() => setTempDuration(Math.max(1, tempDuration - 5))}
+                  onClick={() => {
+                    const current = typeof tempDuration === 'string' ? (tempDuration === '' ? 0 : parseInt(tempDuration, 10)) : tempDuration;
+                    setTempDuration(Math.max(1, current - 5));
+                  }}
                   className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl font-bold"
                 >
                   -
@@ -1384,11 +1401,12 @@ export default function Home() {
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={String(tempDuration)}
+                  placeholder="0"
+                  value={tempDuration}
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, '');
                     if (val === '') {
-                      setTempDuration(1);
+                      setTempDuration('');
                     } else {
                       const num = parseInt(val, 10);
                       if (num >= 1 && num <= 120) {
@@ -1398,19 +1416,21 @@ export default function Home() {
                       }
                     }
                   }}
-                  onBlur={(e) => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    const num = parseInt(val, 10);
-                    if (isNaN(num) || num < 1) {
-                      setTempDuration(1);
-                    } else if (num > 120) {
-                      setTempDuration(120);
+                  onBlur={() => {
+                    if (tempDuration === '') setTempDuration('');
+                    else {
+                      const num = typeof tempDuration === 'string' ? parseInt(tempDuration, 10) : tempDuration;
+                      if (isNaN(num) || num < 1) setTempDuration('');
+                      else if (num > 120) setTempDuration(120);
                     }
                   }}
-                  className="w-20 h-12 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white"
+                  className="w-20 h-12 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white placeholder-gray-400"
                 />
                 <button
-                  onClick={() => setTempDuration(Math.min(120, tempDuration + 5))}
+                  onClick={() => {
+                    const current = typeof tempDuration === 'string' ? (tempDuration === '' ? 0 : parseInt(tempDuration, 10)) : tempDuration;
+                    setTempDuration(Math.min(120, current + 5));
+                  }}
                   className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl font-bold"
                 >
                   +
