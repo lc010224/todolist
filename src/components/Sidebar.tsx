@@ -284,7 +284,7 @@ export function Sidebar({ currentListId, onSelectList }: SidebarProps) {
         >
           {getUserAvatar()}
           <div className="flex-1 text-left">
-            <p className="text-sm font-medium text-gray-800 dark:text-white">{user?.name || '点击登录'}</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-white">{user?.nickname || '点击登录'}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">免费版</p>
           </div>
         </button>
